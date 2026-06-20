@@ -1,7 +1,9 @@
-import { useAuthStore } from "@/shared/model/auth-store";
-import { SettingsList } from "@/features/settings/ui/settings-list";
-import { SectionCard } from "@/shared/ui/section-card";
 import { AutoDeleteSheet } from "@/features/settings/ui/auto-delete-sheet";
+import { InfoSheet } from "@/features/settings/ui/info-sheet";
+import { ProfileSheet } from "@/features/settings/ui/profile-sheet";
+import { SettingsList } from "@/features/settings/ui/settings-list";
+import { useAuthStore } from "@/shared/model/auth-store";
+import { SectionCard } from "@/shared/ui/section-card";
 
 export function SettingsPage() {
   const user = useAuthStore((state) => state.user);
@@ -11,7 +13,7 @@ export function SettingsPage() {
       <div className="mx-auto flex max-w-xl flex-col gap-4">
         <div>
           <h1 className="screen-title">Настройки</h1>
-          <p className="subtle-text mt-1">Управление профилем, безопасностью и TTL сообщений.</p>
+          <p className="subtle-text mt-1">Профиль, безопасность и локальные параметры приложения.</p>
         </div>
         <SectionCard className="flex items-center gap-4">
           <img
@@ -28,6 +30,8 @@ export function SettingsPage() {
         <SettingsList />
       </div>
       <AutoDeleteSheet />
+      <ProfileSheet />
+      <InfoSheet />
     </>
   );
 }

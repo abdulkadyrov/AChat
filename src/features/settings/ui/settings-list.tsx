@@ -1,13 +1,27 @@
 import { ChevronRight } from "lucide-react";
-import { SectionCard } from "@/shared/ui/section-card";
+import { useNavigate } from "react-router-dom";
 import { useSettingsSections } from "@/features/settings/model/use-settings-sections";
+import { useAuthStore } from "@/shared/model/auth-store";
 import { useUiStore } from "@/shared/model/ui-store";
+import { SectionCard } from "@/shared/ui/section-card";
 
 export function SettingsList() {
   const items = useSettingsSections();
+  const navigate = useNavigate();
+  const signOut = useAuthStore((state) => state.signOut);
   const setModalState = useUiStore((state) => state.setModalState);
   const setTheme = useUiStore((state) => state.setTheme);
   const theme = useUiStore((state) => state.theme);
+
+  function handleItemClick(label: string) {
+    if (label === "Профиль") setModalState("profile");
+    if (label === "Семья") navigate("/family");
+    if (label === "Уведомления") setModalState("notifications");
+    if (label === "Автоудаление сообщений") setModalState("auto-delete");
+    if (label === "Тема") setTheme(theme === "light" ? "dark" : "light");
+    if (label === "Безопасность") setModalState("security");
+    if (label === "О приложении") setModalState("about");
+  }
 
   return (
     <SectionCard className="overflow-hidden p-0">
@@ -19,10 +33,7 @@ export function SettingsList() {
             <button
               key={item.label}
               type="button"
-              onClick={() => {
-                if (item.label === "Автоудаление сообщений") setModalState("auto-delete");
-                if (item.label === "Тема") setTheme(theme === "light" ? "dark" : "light");
-              }}
+              onClick={() => handleItemClick(item.label)}
               className="flex w-full items-center gap-3 px-4 py-4 text-left transition hover:bg-slate-50/80 dark:hover:bg-white/5"
             >
               <div className="flex h-10 w-10 items-center justify-center rounded-full border border-slate-200/80 dark:border-white/10">
@@ -40,6 +51,10 @@ export function SettingsList() {
         })}
         <button
           type="button"
+          onClick={() => {
+            signOut();
+            navigate("/chats");
+          }}
           className="flex w-full items-center gap-3 px-4 py-4 text-left text-rose-500 transition hover:bg-rose-50 dark:hover:bg-rose-500/10"
         >
           Выйти из аккаунта

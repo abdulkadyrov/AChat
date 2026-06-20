@@ -1,13 +1,15 @@
 import { useState } from "react";
 import { Plus, Settings } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { useChats } from "@/features/chats/model/use-chats";
 import { ChatList } from "@/entities/chat/ui/chat-list";
-import { SearchInput } from "@/shared/ui/search-input";
 import { IconButton } from "@/shared/ui/icon-button";
+import { SearchInput } from "@/shared/ui/search-input";
 import { SectionCard } from "@/shared/ui/section-card";
 
 export function ChatsPage() {
   const chats = useChats();
+  const navigate = useNavigate();
   const [search, setSearch] = useState("");
 
   const normalized = search.trim().toLowerCase();
@@ -22,7 +24,7 @@ export function ChatsPage() {
           <h1 className="screen-title">Чаты</h1>
           <p className="subtle-text mt-1">Семейный мессенджер со сквозным шифрованием</p>
         </div>
-        <IconButton>
+        <IconButton onClick={() => navigate("/settings")}>
           <Settings className="h-5 w-5" />
         </IconButton>
       </div>
@@ -30,7 +32,7 @@ export function ChatsPage() {
       <ChatList chats={filteredChats} />
       <SectionCard className="flex items-center justify-center gap-2 py-5 text-center">
         <p className="subtle-text max-w-56">
-          Сообщения защищены сквозным шифрованием и могут удаляться автоматически.
+          Чаты пока показывают demo-контент, но профиль, тема и локальные настройки уже сохраняются по-настоящему.
         </p>
       </SectionCard>
       <button className="fixed bottom-24 right-6 flex h-14 w-14 items-center justify-center rounded-full bg-accent text-white shadow-xl shadow-emerald-900/20 transition hover:scale-[1.02] sm:right-[max(2rem,calc((100vw-72rem)/2+2rem))]">

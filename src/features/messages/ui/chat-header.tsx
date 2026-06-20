@@ -1,6 +1,7 @@
 import { ArrowLeft, Lock, MoreVertical, Phone } from "lucide-react";
 import { Link } from "react-router-dom";
 import type { Chat } from "@/shared/types/domain";
+import { useUiStore } from "@/shared/model/ui-store";
 import { AvatarStack } from "@/shared/ui/avatar-stack";
 import { IconButton } from "@/shared/ui/icon-button";
 
@@ -9,6 +10,8 @@ interface ChatHeaderProps {
 }
 
 export function ChatHeader({ chat }: ChatHeaderProps) {
+  const setModalState = useUiStore((state) => state.setModalState);
+
   return (
     <div className="mb-4 flex items-center gap-3">
       <Link
@@ -30,10 +33,10 @@ export function ChatHeader({ chat }: ChatHeaderProps) {
         </div>
       </div>
       <div className="flex items-center gap-2">
-        <IconButton>
+        <IconButton onClick={() => setModalState("chat-settings")}>
           <Phone className="h-4 w-4" />
         </IconButton>
-        <IconButton>
+        <IconButton onClick={() => setModalState("chat-settings")}>
           <MoreVertical className="h-4 w-4" />
         </IconButton>
       </div>

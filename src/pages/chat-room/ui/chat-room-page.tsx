@@ -1,6 +1,7 @@
 import { useParams } from "react-router-dom";
 import { ChatHeader } from "@/features/messages/ui/chat-header";
 import { MessageInput } from "@/features/messages/ui/message-input";
+import { InfoSheet } from "@/features/settings/ui/info-sheet";
 import { MessageBubble } from "@/entities/message/ui/message-bubble";
 import { useChatStore } from "@/shared/model/chat-store";
 import { useMessageStore } from "@/shared/model/message-store";
@@ -35,6 +36,7 @@ export function ChatRoomPage() {
         Сообщения удаляются через 7 дней
       </SectionCard>
       <MessageInput chatId={chat.id} />
+      <InfoSheet />
     </div>
   );
 }
