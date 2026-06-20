@@ -1,7 +1,8 @@
 export type MessageType = "text" | "voice" | "image" | "system";
-export type ChatType = "family" | "direct";
+export type ChatType = "direct" | "group";
 export type ThemeMode = "light" | "dark";
 export type MessageTTL = "off" | "24h" | "7d" | "30d";
+export type InviteKind = "direct" | "group";
 
 export interface UserProfile {
   id: string;
@@ -36,6 +37,24 @@ export interface Chat {
   avatarGroup: string[];
   unreadCount: number;
   lastMessageAt: string;
+  ownerId: string;
+  participantIds: string[];
+  memberLimit: number | null;
+  inviteId: string | null;
+  targetPhone: string | null;
+}
+
+export interface ChatInvite {
+  id: string;
+  chatId: string;
+  kind: InviteKind;
+  title: string;
+  createdBy: string;
+  createdByPhone: string;
+  allowedPhone: string | null;
+  maxParticipants: number;
+  createdAt: string;
+  token: string;
 }
 
 export interface Message {

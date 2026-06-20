@@ -1,43 +1,63 @@
-import { QrCode, UserPlus } from "lucide-react";
-import { useFamily } from "@/features/family/model/use-family";
-import { MemberList } from "@/features/family/ui/member-list";
+import { Link2, Users } from "lucide-react";
+import { Link } from "react-router-dom";
+import { useChatStore } from "@/shared/model/chat-store";
 import { SectionCard } from "@/shared/ui/section-card";
 
 export function FamilyPage() {
-  const { family, members } = useFamily();
+  const chats = useChatStore((state) => state.chats);
+  const invites = useChatStore((state) => state.invites);
+  const groups = chats.filter((chat) => chat.type === "group");
 
   return (
     <div className="mx-auto flex max-w-xl flex-col gap-4">
       <div>
-        <h1 className="screen-title">{family.name}</h1>
-        <p className="subtle-text mt-1">Только участники семьи видят историю сообщений.</p>
+        <h1 className="screen-title">Группы</h1>
+        <p className="subtle-text mt-1">Здесь видны созданные группы и их лимиты на вход по QR.</p>
       </div>
-      <div>
-        <p className="mb-2 text-sm font-semibold text-ink-soft dark:text-slate-400">Участники</p>
-        <MemberList members={members} />
-      </div>
-      <SectionCard className="space-y-3">
-        <button className="flex w-full items-center gap-3 rounded-2xl border border-slate-200/80 px-4 py-3 dark:border-white/10">
-          <UserPlus className="h-5 w-5 text-accent" />
-          <span className="font-semibold">Пригласить в семью</span>
-        </button>
-        <button className="flex w-full items-center gap-3 rounded-2xl border border-slate-200/80 px-4 py-3 dark:border-white/10">
-          <QrCode className="h-5 w-5 text-accent" />
-          <span className="font-semibold">QR-код приглашения</span>
-        </button>
-      </SectionCard>
-      <SectionCard className="text-center">
-        <div className="mx-auto flex h-52 w-52 items-center justify-center rounded-[24px] border border-slate-200/80 bg-white dark:border-white/10 dark:bg-white">
-          <img
-            src="https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=ACHAT-FAMILY-2026"
-            alt="Invite QR"
-            className="h-44 w-44"
-          />
+
+      {groups.length === 0 ? (
+        <SectionCard className="text-center">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-accent-soft text-accent dark:bg-accent/15 dark:text-accent-dark">
+            <Users className="h-7 w-7" />
+          </div>
+          <p className="mt-4 text-lg font-extrabold tracking-[-0.03em]">Групп пока нет</p>
+          <p className="subtle-text mt-2">Создайте первую группу через кнопку плюс на странице чатов.</p>
+        </SectionCard>
+      ) : (
+        <div className="space-y-3">
+          {groups.map((group) => {
+            const invite = invites.find((item) => item.chatId === group.id);
+
+            return (
+              <SectionCard key={group.id}>
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-lg font-extrabold tracking-[-0.03em]">{group.title}</p>
+                    <p className="subtle-text mt-1">
+                      Лимит участников по QR: {group.memberLimit ?? "без лимита"}
+                    </p>
+                  </div>
+                  <Link
+                    to={`/chat/${group.id}`}
+                    className="rounded-xl bg-accent-soft px-3 py-2 text-sm font-semibold text-accent dark:bg-accent/15 dark:text-accent-dark"
+                  >
+                    Открыть
+                  </Link>
+                </div>
+                {invite && (
+                  <div className="mt-4 rounded-2xl bg-slate-100 px-3 py-3 text-xs break-all dark:bg-white/5">
+                    <div className="mb-2 flex items-center gap-2 font-semibold">
+                      <Link2 className="h-4 w-4" />
+                      Код приглашения
+                    </div>
+                    {invite.token}
+                  </div>
+                )}
+              </SectionCard>
+            );
+          })}
         </div>
-        <p className="mt-4 text-sm text-ink-soft dark:text-slate-400">
-          Покажите этот код тому, кого хотите пригласить. Код действует 7 дней.
-        </p>
-      </SectionCard>
+      )}
     </div>
   );
 }

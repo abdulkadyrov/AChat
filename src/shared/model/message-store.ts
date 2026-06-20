@@ -1,6 +1,6 @@
 import { create } from "zustand";
+import { persist } from "zustand/middleware";
 import type { Message } from "@/shared/types/domain";
-import { demoMessages } from "@/shared/mocks/demo-data";
 
 interface MessageState {
   messagesByChatId: Record<string, Message[]>;
@@ -9,15 +9,25 @@ interface MessageState {
   setSendingState: (state: MessageState["sendingState"]) => void;
 }
 
-export const useMessageStore = create<MessageState>((set) => ({
-  messagesByChatId: demoMessages,
-  sendingState: "idle",
-  enqueueMessage: (message) =>
-    set((state) => ({
-      messagesByChatId: {
-        ...state.messagesByChatId,
-        [message.chatId]: [...(state.messagesByChatId[message.chatId] ?? []), message]
-      }
-    })),
-  setSendingState: (sendingState) => set({ sendingState })
-}));
+export const useMessageStore = create<MessageState>()(
+  persist(
+    (set) => ({
+      messagesByChatId: {},
+      sendingState: "idle",
+      enqueueMessage: (message) =>
+        set((state) => ({
+          messagesByChatId: {
+            ...state.messagesByChatId,
+            [message.chatId]: [...(state.messagesByChatId[message.chatId] ?? []), message]
+          }
+        })),
+      setSendingState: (sendingState) => set({ sendingState })
+    }),
+    {
+      name: "achat-messages",
+      partialize: (state) => ({
+        messagesByChatId: state.messagesByChatId
+      })
+    }
+  )
+);

@@ -92,7 +92,7 @@ export const demoChats: Chat[] = [
   {
     id: "chat-family",
     familyId: demoFamily.id,
-    type: "family",
+    type: "group",
     title: "Семья",
     subtitle: "Мама: Привет! Как дела?",
     avatarGroup: [
@@ -101,7 +101,12 @@ export const demoChats: Chat[] = [
       "https://i.pravatar.cc/80?img=12"
     ],
     unreadCount: 2,
-    lastMessageAt: "2026-06-20T12:30:00.000Z"
+    lastMessageAt: "2026-06-20T12:30:00.000Z",
+    ownerId: currentUser.id,
+    participantIds: [currentUser.id, "user-mama", "user-brother"],
+    memberLimit: 4,
+    inviteId: "invite-family",
+    targetPhone: null
   },
   {
     id: "chat-mama",
@@ -111,7 +116,12 @@ export const demoChats: Chat[] = [
     subtitle: "Спасибо, сынок! ❤️",
     avatarGroup: ["https://i.pravatar.cc/80?img=32"],
     unreadCount: 1,
-    lastMessageAt: "2026-06-20T11:20:00.000Z"
+    lastMessageAt: "2026-06-20T11:20:00.000Z",
+    ownerId: currentUser.id,
+    participantIds: [currentUser.id, "user-mama"],
+    memberLimit: 1,
+    inviteId: "invite-mama",
+    targetPhone: "+79003331290"
   },
   {
     id: "chat-brother",
@@ -121,7 +131,12 @@ export const demoChats: Chat[] = [
     subtitle: "Хорошо 👍",
     avatarGroup: ["https://i.pravatar.cc/80?img=12"],
     unreadCount: 0,
-    lastMessageAt: "2026-06-20T10:05:00.000Z"
+    lastMessageAt: "2026-06-20T10:05:00.000Z",
+    ownerId: currentUser.id,
+    participantIds: [currentUser.id, "user-brother"],
+    memberLimit: 1,
+    inviteId: "invite-brother",
+    targetPhone: "+79007001122"
   }
 ];
 
