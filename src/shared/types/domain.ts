@@ -42,6 +42,7 @@ export interface Chat {
   memberLimit: number | null;
   inviteId: string | null;
   targetPhone: string | null;
+  messageTtl: MessageTTL;
 }
 
 export interface ChatInvite {

@@ -29,6 +29,12 @@ interface ChatState {
   createGroupChat: (input: CreateGroupInput) => ChatInvite;
   joinByInviteToken: (input: JoinInviteInput) => { ok: true; chatId: string } | { ok: false; reason: string };
   updateGroupLimit: (chatId: string, memberLimit: number) => void;
+  updateChatSettings: (input: {
+    chatId: string;
+    title: string;
+    messageTtl: Chat["messageTtl"];
+    memberLimit?: number;
+  }) => void;
 }
 
 function buildBaseChat(input: {
@@ -56,6 +62,8 @@ function buildBaseChat(input: {
     memberLimit: input.memberLimit,
     inviteId: input.inviteId,
     targetPhone: input.targetPhone
+    ,
+    messageTtl: "7d"
   } satisfies Chat;
 }
 
@@ -171,7 +179,8 @@ export const useChatStore = create<ChatState>()(
                 participantIds: [user.id],
                 memberLimit: payload.kind === "group" ? payload.maxParticipants : 1,
                 inviteId: payload.inviteId,
-                targetPhone: payload.allowedPhone
+                targetPhone: payload.allowedPhone,
+                messageTtl: "7d"
               };
 
           if (
@@ -216,6 +225,53 @@ export const useChatStore = create<ChatState>()(
                   })
                 }
               : invite
+          )
+        })),
+      updateChatSettings: ({ chatId, title, messageTtl, memberLimit }) =>
+        set((state) => ({
+          chats: state.chats.map((chat) =>
+            chat.id === chatId
+              ? {
+                  ...chat,
+                  title: title.trim(),
+                  messageTtl,
+                  memberLimit:
+                    chat.type === "group" && typeof memberLimit === "number"
+                      ? Math.max(1, Math.min(memberLimit, 50))
+                      : chat.memberLimit,
+                  subtitle:
+                    chat.type === "group"
+                      ? `Лимит участников: ${
+                          typeof memberLimit === "number"
+                            ? Math.max(1, Math.min(memberLimit, 50))
+                            : chat.memberLimit ?? 1
+                        }`
+                      : `Личный чат для ${chat.targetPhone ?? "выбранного номера"}`
+                }
+              : chat
+          ),
+          invites: state.invites.map((invite) =>
+            invite.chatId === chatId && invite.kind === "group" && typeof memberLimit === "number"
+              ? {
+                  ...invite,
+                  title: title.trim(),
+                  maxParticipants: Math.max(1, Math.min(memberLimit, 50)),
+                  token: buildInviteToken({
+                    ...invite,
+                    title: title.trim(),
+                    maxParticipants: Math.max(1, Math.min(memberLimit, 50))
+                  })
+                }
+              : invite.chatId === chatId
+                ? {
+                    ...invite,
+                    title: title.trim(),
+                    token: buildInviteToken({
+                      ...invite,
+                      title: title.trim()
+                    })
+                  }
+                : invite
           )
         }))
     }),

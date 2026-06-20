@@ -106,7 +106,8 @@ export const demoChats: Chat[] = [
     participantIds: [currentUser.id, "user-mama", "user-brother"],
     memberLimit: 4,
     inviteId: "invite-family",
-    targetPhone: null
+    targetPhone: null,
+    messageTtl: "7d"
   },
   {
     id: "chat-mama",
@@ -121,7 +122,8 @@ export const demoChats: Chat[] = [
     participantIds: [currentUser.id, "user-mama"],
     memberLimit: 1,
     inviteId: "invite-mama",
-    targetPhone: "+79003331290"
+    targetPhone: "+79003331290",
+    messageTtl: "7d"
   },
   {
     id: "chat-brother",
@@ -136,7 +138,8 @@ export const demoChats: Chat[] = [
     participantIds: [currentUser.id, "user-brother"],
     memberLimit: 1,
     inviteId: "invite-brother",
-    targetPhone: "+79007001122"
+    targetPhone: "+79007001122",
+    messageTtl: "7d"
   }
 ];
 

@@ -20,7 +20,7 @@ export function MessageInput({ chatId }: MessageInputProps) {
   };
 
   return (
-    <div className="glass-panel sticky bottom-[5.5rem] flex items-center gap-2 rounded-[22px] p-2 sm:bottom-24">
+    <div className="glass-panel fixed bottom-[5.25rem] left-1/2 z-30 flex w-[calc(100%-2rem)] max-w-xl -translate-x-1/2 items-center gap-2 rounded-[22px] p-2 sm:bottom-[6.25rem]">
       <IconButton className="h-11 w-11 border-none bg-transparent shadow-none">
         <Plus className="h-5 w-5" />
       </IconButton>
