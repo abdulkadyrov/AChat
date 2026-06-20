@@ -4,6 +4,7 @@ import { VitePWA } from "vite-plugin-pwa";
 import path from "node:path";
 
 export default defineConfig({
+  base: "/AChat/",
   plugins: [
     react(),
     VitePWA({
@@ -16,7 +17,7 @@ export default defineConfig({
         theme_color: "#0b7a43",
         background_color: "#f6f2e8",
         display: "standalone",
-        start_url: "/",
+        start_url: "/AChat/",
         icons: [
           {
             src: "favicon.svg",

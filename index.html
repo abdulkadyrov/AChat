@@ -8,6 +8,15 @@
     />
     <meta name="theme-color" content="#0b7a43" />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <script>
+      (function () {
+        var redirect = sessionStorage.getItem("achat_redirect");
+        if (redirect) {
+          sessionStorage.removeItem("achat_redirect");
+          window.history.replaceState(null, "", redirect);
+        }
+      })();
+    </script>
     <title>AChat</title>
   </head>
   <body>
