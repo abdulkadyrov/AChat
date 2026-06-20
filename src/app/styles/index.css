@@ -32,7 +32,7 @@ textarea {
 }
 
 .glass-panel {
-  @apply border border-white/60 bg-white/78 shadow-card backdrop-blur-xl dark:border-white/10 dark:bg-white/5;
+  @apply border border-white/60 bg-white/[0.78] shadow-card backdrop-blur-xl dark:border-white/10 dark:bg-white/5;
 }
 
 .screen-title {

@@ -7,6 +7,9 @@ export function useChats() {
 
   return chats.map((chat) => ({
     ...chat,
-    lastMessage: messagesByChatId[chat.id]?.at(-1)
+    lastMessage: (() => {
+      const chatMessages = messagesByChatId[chat.id] ?? [];
+      return chatMessages[chatMessages.length - 1];
+    })()
   }));
 }
