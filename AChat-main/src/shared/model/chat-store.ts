@@ -1,0 +1,294 @@
+import { create } from "zustand";
+import { persist } from "zustand/middleware";
+import { generateSharedSecret } from "@/shared/lib/crypto/achat-crypto";
+import { buildInviteToken, normalizePhone } from "@/shared/lib/invite/token";
+import { parseInviteToken } from "@/shared/lib/invite/token";
+import {
+  createRemoteChat,
+  deleteRemoteChat,
+  fetchRemoteChats,
+  joinRemoteChatByInvite,
+  updateRemoteChatSettings
+} from "@/shared/lib/supabase/messaging";
+import { useMessageStore } from "@/shared/model/message-store";
+import type { Chat, ChatInvite, MessageTTL, UserProfile } from "@/shared/types/domain";
+
+interface CreateDirectInput {
+  title: string;
+  recipientPhone: string;
+  user: UserProfile;
+}
+
+interface CreateGroupInput {
+  title: string;
+  memberLimit: number;
+  user: UserProfile;
+}
+
+interface JoinInviteInput {
+  token: string;
+  user: UserProfile;
+}
+
+interface ChatState {
+  chats: Chat[];
+  invites: ChatInvite[];
+  chatSecretsByChatId: Record<string, string>;
+  currentChatId: string;
+  loading: boolean;
+  setCurrentChatId: (chatId: string) => void;
+  hydrateChats: (user: UserProfile) => Promise<void>;
+  createDirectChat: (input: CreateDirectInput) => Promise<ChatInvite>;
+  createGroupChat: (input: CreateGroupInput) => Promise<ChatInvite>;
+  joinByInviteToken: (input: JoinInviteInput) => Promise<{ ok: true; chatId: string } | { ok: false; reason: string }>;
+  updateGroupLimit: (chatId: string, memberLimit: number) => void;
+  updateChatSettings: (input: {
+    chatId: string;
+    title: string;
+    messageTtl: MessageTTL;
+    memberLimit?: number;
+  }) => Promise<void>;
+  deleteChat: (chatId: string) => Promise<void>;
+}
+
+async function buildLocalChatInvite(input: {
+  title: string;
+  type: Chat["type"];
+  user: UserProfile;
+  memberLimit: number | null;
+  targetPhone: string | null;
+}) {
+  const chatId = crypto.randomUUID();
+  const inviteId = crypto.randomUUID();
+  const createdAt = new Date().toISOString();
+  const chatSecret = await generateSharedSecret();
+
+  const invite: ChatInvite = {
+    id: inviteId,
+    chatId,
+    kind: input.type,
+    title: input.title.trim(),
+    createdBy: input.user.id,
+    createdByPhone: normalizePhone(input.user.phone),
+    allowedPhone: input.targetPhone ? normalizePhone(input.targetPhone) : null,
+    maxParticipants: input.type === "group" ? Math.max(1, input.memberLimit ?? 1) : 1,
+    createdAt,
+    chatSecret,
+    token: ""
+  };
+
+  invite.token = buildInviteToken(invite);
+
+  const chat: Chat = {
+    id: chatId,
+    familyId: chatId,
+    type: input.type,
+    title: input.title.trim(),
+    subtitle: input.type === "group" ? "Участников: 1" : "Защищенный чат",
+    avatarGroup: [input.user.avatarUrl],
+    unreadCount: 0,
+    lastMessageAt: createdAt,
+    ownerId: input.user.id,
+    participantIds: [input.user.id],
+    memberLimit: input.memberLimit,
+    inviteId,
+    targetPhone: invite.allowedPhone,
+    messageTtl: "7d"
+  };
+
+  return { chat, invite, chatSecret };
+}
+
+export const useChatStore = create<ChatState>()(
+  persist(
+    (set, get) => ({
+      chats: [],
+      invites: [],
+      chatSecretsByChatId: {},
+      currentChatId: "",
+      loading: false,
+      setCurrentChatId: (chatId) => set({ currentChatId: chatId }),
+      hydrateChats: async (user) => {
+        set({ loading: true });
+        try {
+          const chats = await fetchRemoteChats(user);
+          set((state) => ({
+            chats: chats.map((chat) => {
+              const localInvite = state.invites.find((invite) => invite.chatId === chat.id);
+              return localInvite ? { ...chat, inviteId: localInvite.id } : chat;
+            }),
+            loading: false
+          }));
+        } catch {
+          set({ loading: false });
+        }
+      },
+      createDirectChat: async ({ title, recipientPhone, user }) => {
+        const { chat, invite, chatSecret } = await createRemoteChat({
+          title,
+          type: "direct",
+          memberLimit: 1,
+          targetPhone: recipientPhone,
+          user
+        }).catch(() =>
+          buildLocalChatInvite({
+            title,
+            type: "direct",
+            memberLimit: 1,
+            targetPhone: recipientPhone,
+            user
+          })
+        );
+
+        set((state) => ({
+          chats: [chat, ...state.chats.filter((item) => item.id !== chat.id)],
+          invites: [invite, ...state.invites.filter((item) => item.id !== invite.id)],
+          chatSecretsByChatId: {
+            ...state.chatSecretsByChatId,
+            [chat.id]: chatSecret
+          },
+          currentChatId: chat.id
+        }));
+
+        return invite;
+      },
+      createGroupChat: async ({ title, memberLimit, user }) => {
+        const { chat, invite, chatSecret } = await createRemoteChat({
+          title,
+          type: "group",
+          memberLimit,
+          targetPhone: null,
+          user
+        }).catch(() =>
+          buildLocalChatInvite({
+            title,
+            type: "group",
+            memberLimit,
+            targetPhone: null,
+            user
+          })
+        );
+
+        set((state) => ({
+          chats: [chat, ...state.chats.filter((item) => item.id !== chat.id)],
+          invites: [invite, ...state.invites.filter((item) => item.id !== invite.id)],
+          chatSecretsByChatId: {
+            ...state.chatSecretsByChatId,
+            [chat.id]: chatSecret
+          },
+          currentChatId: chat.id
+        }));
+
+        return invite;
+      },
+      joinByInviteToken: async ({ token, user }) => {
+        try {
+          const payload = parseInviteToken(token.trim());
+          const { chat, chatSecret } = await joinRemoteChatByInvite({
+            inviteId: payload.inviteId,
+            chatSecret: payload.chatSecret,
+            user
+          });
+
+          set((state) => ({
+            chats: [chat, ...state.chats.filter((item) => item.id !== chat.id)],
+            chatSecretsByChatId: {
+              ...state.chatSecretsByChatId,
+              [chat.id]: chatSecret
+            },
+            currentChatId: chat.id
+          }));
+
+          return { ok: true as const, chatId: chat.id };
+        } catch (error) {
+          return {
+            ok: false as const,
+            reason:
+              error instanceof Error
+                ? error.message
+                : "Не удалось подключиться по QR-коду."
+          };
+        }
+      },
+      updateGroupLimit: (chatId, memberLimit) =>
+        set((state) => ({
+          chats: state.chats.map((chat) =>
+            chat.id === chatId && chat.type === "group"
+              ? {
+                  ...chat,
+                  memberLimit: Math.max(1, Math.min(memberLimit, 50)),
+                  subtitle: `Лимит участников: ${Math.max(1, Math.min(memberLimit, 50))}`
+                }
+              : chat
+          ),
+          invites: state.invites.map((invite) =>
+            invite.chatId === chatId && invite.kind === "group"
+              ? {
+                  ...invite,
+                  maxParticipants: Math.max(1, Math.min(memberLimit, 50))
+                }
+              : invite
+          )
+        })),
+      updateChatSettings: async ({ chatId, title, messageTtl, memberLimit }) => {
+        await updateRemoteChatSettings({
+          chatId,
+          title,
+          messageTtl,
+          memberLimit
+        });
+        set((state) => ({
+          chats: state.chats.map((chat) =>
+            chat.id === chatId
+              ? {
+                  ...chat,
+                  title: title.trim(),
+                  messageTtl,
+                  memberLimit:
+                    chat.type === "group" && typeof memberLimit === "number"
+                      ? Math.max(1, Math.min(memberLimit, 50))
+                      : chat.memberLimit
+                }
+              : chat
+          ),
+          invites: state.invites.map((invite) =>
+            invite.chatId === chatId
+              ? {
+                  ...invite,
+                  title: title.trim(),
+                  maxParticipants:
+                    invite.kind === "group" && typeof memberLimit === "number"
+                      ? Math.max(1, Math.min(memberLimit, 50))
+                      : invite.maxParticipants
+                }
+              : invite
+          )
+        }));
+      },
+      deleteChat: async (chatId) => {
+        await deleteRemoteChat(chatId).catch(() => undefined);
+        useMessageStore.getState().clearChatMessages(chatId);
+        set((state) => {
+          const nextSecrets = { ...state.chatSecretsByChatId };
+          delete nextSecrets[chatId];
+
+          return {
+            chats: state.chats.filter((chat) => chat.id !== chatId),
+            invites: state.invites.filter((invite) => invite.chatId !== chatId),
+            chatSecretsByChatId: nextSecrets,
+            currentChatId: state.currentChatId === chatId ? "" : state.currentChatId
+          };
+        });
+      }
+    }),
+    {
+      name: "achat-chats",
+      partialize: (state) => ({
+        chats: state.chats,
+        invites: state.invites,
+        chatSecretsByChatId: state.chatSecretsByChatId,
+        currentChatId: state.currentChatId
+      })
+    }
+  )
+);
