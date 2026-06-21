@@ -1,10 +1,11 @@
 import { useState } from "react";
-import { MessagesSquare, QrCode, Users } from "lucide-react";
+import { KeyRound, MessagesSquare, Users } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { JoinChatScanner } from "@/features/chats/ui/join-chat-scanner";
+import { JoinChatCodeSheet } from "@/features/chats/ui/join-chat-code-sheet";
 import { useAuthStore } from "@/shared/model/auth-store";
 import { useChatStore } from "@/shared/model/chat-store";
-import { QrCodeCard } from "@/shared/ui/qr-code-card";
+import { AccessCodeCard } from "@/shared/ui/access-code-card";
+import { parsePhoneList } from "@/shared/lib/invite/token";
 import type { ChatInvite, UserProfile } from "@/shared/types/domain";
 
 interface ComposeChatSheetProps {
@@ -12,7 +13,7 @@ interface ComposeChatSheetProps {
   onClose: () => void;
 }
 
-type Mode = "menu" | "direct" | "group" | "qr";
+type Mode = "menu" | "direct" | "group" | "code";
 
 export function ComposeChatSheet({ open, onClose }: ComposeChatSheetProps) {
   const navigate = useNavigate();
@@ -20,11 +21,13 @@ export function ComposeChatSheet({ open, onClose }: ComposeChatSheetProps) {
   const createDirectChat = useChatStore((state) => state.createDirectChat);
   const createGroupChat = useChatStore((state) => state.createGroupChat);
   const [mode, setMode] = useState<Mode>("menu");
-  const [scannerOpen, setScannerOpen] = useState(false);
+  const [joinCodeOpen, setJoinCodeOpen] = useState(false);
   const [title, setTitle] = useState("");
   const [recipientPhone, setRecipientPhone] = useState("");
-  const [groupLimit, setGroupLimit] = useState("3");
+  const [groupCount, setGroupCount] = useState("");
+  const [groupPhones, setGroupPhones] = useState("");
   const [invite, setInvite] = useState<ChatInvite | null>(null);
+  const [error, setError] = useState("");
 
   if (!open || !user) return null;
   const currentUser: UserProfile = user;
@@ -33,33 +36,61 @@ export function ComposeChatSheet({ open, onClose }: ComposeChatSheetProps) {
     setMode("menu");
     setTitle("");
     setRecipientPhone("");
-    setGroupLimit("3");
+    setGroupCount("");
+    setGroupPhones("");
     setInvite(null);
+    setError("");
     onClose();
   }
 
   async function handleDirectCreate() {
-    if (!title.trim() || !recipientPhone.trim()) return;
-    const createdInvite = await createDirectChat({
-      title,
-      recipientPhone,
-      user: currentUser
-    });
-    setInvite(createdInvite);
-    setMode("qr");
-    navigate(`/chat/${createdInvite.chatId}`);
+    setError("");
+    try {
+      const createdInvite = await createDirectChat({
+        title,
+        recipientPhone,
+        user: currentUser
+      });
+      setInvite(createdInvite);
+      setMode("code");
+      navigate(`/chat/${createdInvite.chatId}`);
+    } catch (createError) {
+      setError(createError instanceof Error ? createError.message : "Не удалось создать личный чат.");
+    }
   }
 
   async function handleGroupCreate() {
-    if (!title.trim()) return;
-    const createdInvite = await createGroupChat({
-      title,
-      memberLimit: Number(groupLimit) || 1,
-      user: currentUser
-    });
-    setInvite(createdInvite);
-    setMode("qr");
-    navigate(`/chat/${createdInvite.chatId}`);
+    setError("");
+    const phones = parsePhoneList(groupPhones);
+    const requestedCount = Number(groupCount) || 0;
+
+    if (!title.trim()) {
+      setError("Введите название группы.");
+      return;
+    }
+
+    if (requestedCount <= 0) {
+      setError("Укажите количество участников группы.");
+      return;
+    }
+
+    if (phones.length !== requestedCount) {
+      setError("Количество номеров должно совпадать с указанным количеством участников.");
+      return;
+    }
+
+    try {
+      const createdInvite = await createGroupChat({
+        title,
+        memberPhones: phones,
+        user: currentUser
+      });
+      setInvite(createdInvite);
+      setMode("code");
+      navigate(`/chat/${createdInvite.chatId}`);
+    } catch (createError) {
+      setError(createError instanceof Error ? createError.message : "Не удалось создать группу.");
+    }
   }
 
   return (
@@ -81,7 +112,7 @@ export function ComposeChatSheet({ open, onClose }: ComposeChatSheetProps) {
                   <div>
                     <p className="font-semibold">Личный чат</p>
                     <p className="text-sm text-ink-soft dark:text-slate-400">
-                      Создается QR-код, который сработает только для указанного номера телефона.
+                      Имя чата и один 8-значный номер, которому разрешён вход.
                     </p>
                   </div>
                 </button>
@@ -94,20 +125,20 @@ export function ComposeChatSheet({ open, onClose }: ComposeChatSheetProps) {
                   <div>
                     <p className="font-semibold">Группа</p>
                     <p className="text-sm text-ink-soft dark:text-slate-400">
-                      Создатель задает лимит участников, которые войдут по QR.
+                      Имя группы, количество участников и список уникальных 8-значных номеров.
                     </p>
                   </div>
                 </button>
                 <button
                   type="button"
-                  onClick={() => setScannerOpen(true)}
+                  onClick={() => setJoinCodeOpen(true)}
                   className="flex w-full items-center gap-3 rounded-2xl border border-slate-200 px-4 py-4 text-left dark:border-white/10"
                 >
-                  <QrCode className="h-5 w-5 text-accent" />
+                  <KeyRound className="h-5 w-5 text-accent" />
                   <div>
-                    <p className="font-semibold">Подключиться по коду</p>
+                    <p className="font-semibold">Войти по коду</p>
                     <p className="text-sm text-ink-soft dark:text-slate-400">
-                      Откроется сканер камеры, как в банковских приложениях, плюс выбор QR из галереи.
+                      Введите 6-значный код из букв и цифр.
                     </p>
                   </div>
                 </button>
@@ -122,22 +153,24 @@ export function ComposeChatSheet({ open, onClose }: ComposeChatSheetProps) {
                 <input
                   value={title}
                   onChange={(event) => setTitle(event.target.value)}
-                  placeholder="Название чата"
+                  placeholder="Имя чата"
                   className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 outline-none focus:border-accent dark:border-white/10 dark:bg-white/5"
                 />
                 <input
                   value={recipientPhone}
                   onChange={(event) => setRecipientPhone(event.target.value)}
-                  placeholder="Телефон человека, который сможет войти"
+                  placeholder="8-значный номер участника"
+                  inputMode="numeric"
                   className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 outline-none focus:border-accent dark:border-white/10 dark:bg-white/5"
                 />
               </div>
+              {error && <p className="mt-3 text-sm text-rose-500">{error}</p>}
               <button
                 type="button"
                 onClick={handleDirectCreate}
                 className="mt-4 w-full rounded-2xl bg-accent px-4 py-3 font-semibold text-white"
               >
-                Создать QR-код
+                Создать код доступа
               </button>
             </>
           )}
@@ -149,38 +182,46 @@ export function ComposeChatSheet({ open, onClose }: ComposeChatSheetProps) {
                 <input
                   value={title}
                   onChange={(event) => setTitle(event.target.value)}
-                  placeholder="Название группы"
+                  placeholder="Имя группы"
                   className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 outline-none focus:border-accent dark:border-white/10 dark:bg-white/5"
                 />
                 <input
-                  value={groupLimit}
-                  onChange={(event) => setGroupLimit(event.target.value)}
+                  value={groupCount}
+                  onChange={(event) => setGroupCount(event.target.value)}
                   type="number"
                   min={1}
                   max={50}
-                  placeholder="Лимит участников"
+                  placeholder="Количество участников"
+                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 outline-none focus:border-accent dark:border-white/10 dark:bg-white/5"
+                />
+                <textarea
+                  value={groupPhones}
+                  onChange={(event) => setGroupPhones(event.target.value)}
+                  rows={5}
+                  placeholder="Номера участников через запятую, пробел или новую строку"
                   className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 outline-none focus:border-accent dark:border-white/10 dark:bg-white/5"
                 />
               </div>
+              {error && <p className="mt-3 text-sm text-rose-500">{error}</p>}
               <button
                 type="button"
                 onClick={handleGroupCreate}
                 className="mt-4 w-full rounded-2xl bg-accent px-4 py-3 font-semibold text-white"
               >
-                Создать QR-код группы
+                Создать код доступа группы
               </button>
             </>
           )}
 
-          {mode === "qr" && invite && (
+          {mode === "code" && invite && (
             <>
-              <h3 className="text-lg font-extrabold">QR-код приглашения</h3>
+              <h3 className="text-lg font-extrabold">Код доступа</h3>
               <div className="mt-4">
-                <QrCodeCard value={invite.token} />
+                <AccessCodeCard value={invite.accessCode} />
                 <p className="mt-4 text-center text-sm text-ink-soft dark:text-slate-400">
                   {invite.kind === "direct"
-                    ? `Сканировать этот QR сможет только номер ${invite.allowedPhone}.`
-                    : `В группу по этому QR смогут войти максимум ${invite.maxParticipants} человек(а) помимо создателя.`}
+                    ? `Войти сможет только номер ${invite.allowedPhones[0]}.`
+                    : `Войти смогут только указанные номера. Всего мест: ${invite.maxParticipants}.`}
                 </p>
               </div>
             </>
@@ -190,7 +231,10 @@ export function ComposeChatSheet({ open, onClose }: ComposeChatSheetProps) {
             {mode !== "menu" && (
               <button
                 type="button"
-                onClick={() => setMode("menu")}
+                onClick={() => {
+                  setError("");
+                  setMode("menu");
+                }}
                 className="flex-1 rounded-2xl border border-slate-200 px-4 py-3 font-semibold dark:border-white/10"
               >
                 Назад
@@ -206,7 +250,7 @@ export function ComposeChatSheet({ open, onClose }: ComposeChatSheetProps) {
           </div>
         </div>
       </div>
-      <JoinChatScanner open={scannerOpen} onClose={() => setScannerOpen(false)} />
+      <JoinChatCodeSheet open={joinCodeOpen} onClose={() => setJoinCodeOpen(false)} />
     </>
   );
 }

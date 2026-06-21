@@ -66,7 +66,7 @@ export function ChatRoomPage() {
       <div className="mx-auto flex max-w-xl flex-col gap-4">
         <SectionCard className="py-10 text-center">
           <p className="text-lg font-extrabold tracking-[-0.03em]">Чат не найден</p>
-          <p className="subtle-text mt-2">Вернитесь в список чатов и создайте новый QR-приглашением.</p>
+          <p className="subtle-text mt-2">Вернитесь в список чатов и создайте новый чат с кодом доступа.</p>
         </SectionCard>
       </div>
     );
@@ -97,14 +97,14 @@ export function ChatRoomPage() {
           <div className="py-10 text-center">
             <p className="text-lg font-extrabold tracking-[-0.03em]">Пока пусто</p>
             <p className="subtle-text mt-2">
-              Чат создан. Теперь можно отправить первое сообщение или поделиться QR.
+              Чат создан. Теперь можно отправить первое сообщение или поделиться кодом доступа.
             </p>
           </div>
         )}
       </SectionCard>
       <SectionCard className="py-3 text-center text-sm text-ink-soft dark:text-slate-400">
         {chat.type === "group"
-          ? `Лимит участников по QR: ${chat.memberLimit ?? "не задан"}`
+          ? `Разрешённых номеров в группе: ${chat.memberLimit ?? "не задано"}`
           : `Этот чат привязан к номеру: ${chat.targetPhone ?? "не задан"}`}
       </SectionCard>
       <MessageInput chatId={chat.id} replyPreview={replyPreview} />

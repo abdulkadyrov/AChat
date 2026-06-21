@@ -1,14 +1,21 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { generateSharedSecret } from "@/shared/lib/crypto/achat-crypto";
-import { buildInviteToken, normalizePhone } from "@/shared/lib/invite/token";
-import { parseInviteToken } from "@/shared/lib/invite/token";
+import {
+  buildInviteToken,
+  dedupePhones,
+  generateAccessCode,
+  isValidMemberPhone,
+  normalizePhone
+} from "@/shared/lib/invite/token";
 import {
   createRemoteChat,
+  deleteRemoteChat,
   fetchRemoteChats,
-  joinRemoteChatByInvite,
+  joinRemoteChatByCode,
   updateRemoteChatSettings
 } from "@/shared/lib/supabase/messaging";
+import { useMessageStore } from "@/shared/model/message-store";
 import type { Chat, ChatInvite, MessageTTL, UserProfile } from "@/shared/types/domain";
 
 interface CreateDirectInput {
@@ -19,12 +26,12 @@ interface CreateDirectInput {
 
 interface CreateGroupInput {
   title: string;
-  memberLimit: number;
+  memberPhones: string[];
   user: UserProfile;
 }
 
 interface JoinInviteInput {
-  token: string;
+  accessCode: string;
   user: UserProfile;
 }
 
@@ -38,7 +45,7 @@ interface ChatState {
   hydrateChats: (user: UserProfile) => Promise<void>;
   createDirectChat: (input: CreateDirectInput) => Promise<ChatInvite>;
   createGroupChat: (input: CreateGroupInput) => Promise<ChatInvite>;
-  joinByInviteToken: (input: JoinInviteInput) => Promise<{ ok: true; chatId: string } | { ok: false; reason: string }>;
+  joinByAccessCode: (input: JoinInviteInput) => Promise<{ ok: true; chatId: string } | { ok: false; reason: string }>;
   updateGroupLimit: (chatId: string, memberLimit: number) => void;
   updateChatSettings: (input: {
     chatId: string;
@@ -46,19 +53,26 @@ interface ChatState {
     messageTtl: MessageTTL;
     memberLimit?: number;
   }) => Promise<void>;
+  deleteChat: (chatId: string) => Promise<void>;
+  clearAllChats: () => void;
+}
+
+function sanitizeAllowedPhones(phones: string[]) {
+  return dedupePhones(phones);
 }
 
 async function buildLocalChatInvite(input: {
   title: string;
   type: Chat["type"];
   user: UserProfile;
-  memberLimit: number | null;
-  targetPhone: string | null;
+  allowedPhones: string[];
 }) {
   const chatId = crypto.randomUUID();
   const inviteId = crypto.randomUUID();
   const createdAt = new Date().toISOString();
   const chatSecret = await generateSharedSecret();
+  const normalizedPhones = sanitizeAllowedPhones(input.allowedPhones);
+  const accessCode = generateAccessCode();
 
   const invite: ChatInvite = {
     id: inviteId,
@@ -67,8 +81,10 @@ async function buildLocalChatInvite(input: {
     title: input.title.trim(),
     createdBy: input.user.id,
     createdByPhone: normalizePhone(input.user.phone),
-    allowedPhone: input.targetPhone ? normalizePhone(input.targetPhone) : null,
-    maxParticipants: input.type === "group" ? Math.max(1, input.memberLimit ?? 1) : 1,
+    accessCode,
+    allowedPhones: normalizedPhones,
+    allowedPhone: normalizedPhones[0] ?? null,
+    maxParticipants: normalizedPhones.length,
     createdAt,
     chatSecret,
     token: ""
@@ -81,24 +97,46 @@ async function buildLocalChatInvite(input: {
     familyId: chatId,
     type: input.type,
     title: input.title.trim(),
-    subtitle: input.type === "group" ? "Участников: 1" : "Защищенный чат",
+    subtitle:
+      input.type === "group"
+        ? `Код для ${normalizedPhones.length} участников`
+        : `Вход по коду для номера ${normalizedPhones[0] ?? "не задан"}`,
     avatarGroup: [input.user.avatarUrl],
     unreadCount: 0,
     lastMessageAt: createdAt,
     ownerId: input.user.id,
     participantIds: [input.user.id],
-    memberLimit: input.memberLimit,
+    participantPhones: [normalizePhone(input.user.phone)],
+    memberLimit: normalizedPhones.length,
     inviteId,
-    targetPhone: invite.allowedPhone,
+    targetPhone: normalizedPhones[0] ?? null,
     messageTtl: "7d"
   };
 
   return { chat, invite, chatSecret };
 }
 
+function validateGroupPhones(phones: string[]) {
+  const normalizedPhones = sanitizeAllowedPhones(phones);
+
+  if (normalizedPhones.length === 0) {
+    return { ok: false as const, reason: "Добавьте хотя бы один 8-значный номер." };
+  }
+
+  if (normalizedPhones.some((phone) => !isValidMemberPhone(phone))) {
+    return { ok: false as const, reason: "Для группы разрешены только 8-значные номера." };
+  }
+
+  if (normalizedPhones.length !== phones.map((phone) => normalizePhone(phone)).filter(Boolean).length) {
+    return { ok: false as const, reason: "Одинаковые номера в группе запрещены." };
+  }
+
+  return { ok: true as const, phones: normalizedPhones };
+}
+
 export const useChatStore = create<ChatState>()(
   persist(
-    (set, get) => ({
+    (set) => ({
       chats: [],
       invites: [],
       chatSecretsByChatId: {},
@@ -121,18 +159,21 @@ export const useChatStore = create<ChatState>()(
         }
       },
       createDirectChat: async ({ title, recipientPhone, user }) => {
+        const normalizedPhone = normalizePhone(recipientPhone);
+        if (!isValidMemberPhone(normalizedPhone)) {
+          throw new Error("Для личного чата нужен один 8-значный номер.");
+        }
+
         const { chat, invite, chatSecret } = await createRemoteChat({
           title,
           type: "direct",
-          memberLimit: 1,
-          targetPhone: recipientPhone,
+          allowedPhones: [normalizedPhone],
           user
         }).catch(() =>
           buildLocalChatInvite({
             title,
             type: "direct",
-            memberLimit: 1,
-            targetPhone: recipientPhone,
+            allowedPhones: [normalizedPhone],
             user
           })
         );
@@ -149,19 +190,22 @@ export const useChatStore = create<ChatState>()(
 
         return invite;
       },
-      createGroupChat: async ({ title, memberLimit, user }) => {
+      createGroupChat: async ({ title, memberPhones, user }) => {
+        const validation = validateGroupPhones(memberPhones);
+        if (!validation.ok) {
+          throw new Error(validation.reason);
+        }
+
         const { chat, invite, chatSecret } = await createRemoteChat({
           title,
           type: "group",
-          memberLimit,
-          targetPhone: null,
+          allowedPhones: validation.phones,
           user
         }).catch(() =>
           buildLocalChatInvite({
             title,
             type: "group",
-            memberLimit,
-            targetPhone: null,
+            allowedPhones: validation.phones,
             user
           })
         );
@@ -178,12 +222,52 @@ export const useChatStore = create<ChatState>()(
 
         return invite;
       },
-      joinByInviteToken: async ({ token, user }) => {
+      joinByAccessCode: async ({ accessCode, user }) => {
+        const normalizedAccessCode = accessCode.trim().toUpperCase();
+        const normalizedUserPhone = normalizePhone(user.phone);
+
+        const localInvite = useChatStore
+          .getState()
+          .invites.find((invite) => invite.accessCode === normalizedAccessCode);
+
+        if (localInvite) {
+          const invitePhones = localInvite.allowedPhones;
+          if (!invitePhones.includes(normalizedUserPhone)) {
+            return { ok: false as const, reason: "Этот код не разрешён для вашего номера." };
+          }
+
+          const targetChat = useChatStore.getState().chats.find((chat) => chat.id === localInvite.chatId);
+          if (!targetChat) {
+            return { ok: false as const, reason: "Чат для этого кода не найден." };
+          }
+
+          if (targetChat.participantPhones.includes(normalizedUserPhone)) {
+            return { ok: false as const, reason: "С этим номером уже вошли в чат." };
+          }
+
+          set((state) => ({
+            chats: state.chats.map((chat) =>
+              chat.id === targetChat.id
+                ? {
+                    ...chat,
+                    participantIds: [...chat.participantIds, user.id],
+                    participantPhones: [...chat.participantPhones, normalizedUserPhone],
+                    subtitle:
+                      chat.type === "group"
+                        ? `Участников: ${chat.participantPhones.length + 1}`
+                        : "Защищенный чат"
+                  }
+                : chat
+            ),
+            currentChatId: targetChat.id
+          }));
+
+          return { ok: true as const, chatId: targetChat.id };
+        }
+
         try {
-          const payload = parseInviteToken(token.trim());
-          const { chat, chatSecret } = await joinRemoteChatByInvite({
-            inviteId: payload.inviteId,
-            chatSecret: payload.chatSecret,
+          const { chat, chatSecret } = await joinRemoteChatByCode({
+            accessCode: normalizedAccessCode,
             user
           });
 
@@ -203,7 +287,7 @@ export const useChatStore = create<ChatState>()(
             reason:
               error instanceof Error
                 ? error.message
-                : "Не удалось подключиться по QR-коду."
+                : "Не удалось подключиться по коду."
           };
         }
       },
@@ -233,7 +317,8 @@ export const useChatStore = create<ChatState>()(
           title,
           messageTtl,
           memberLimit
-        });
+        }).catch(() => undefined);
+
         set((state) => ({
           chats: state.chats.map((chat) =>
             chat.id === chatId
@@ -247,20 +332,32 @@ export const useChatStore = create<ChatState>()(
                       : chat.memberLimit
                 }
               : chat
-          ),
-          invites: state.invites.map((invite) =>
-            invite.chatId === chatId
-              ? {
-                  ...invite,
-                  title: title.trim(),
-                  maxParticipants:
-                    invite.kind === "group" && typeof memberLimit === "number"
-                      ? Math.max(1, Math.min(memberLimit, 50))
-                      : invite.maxParticipants
-                }
-              : invite
           )
         }));
+      },
+      deleteChat: async (chatId) => {
+        await deleteRemoteChat(chatId).catch(() => undefined);
+        useMessageStore.getState().clearChatMessages(chatId);
+        set((state) => {
+          const nextSecrets = { ...state.chatSecretsByChatId };
+          delete nextSecrets[chatId];
+
+          return {
+            chats: state.chats.filter((chat) => chat.id !== chatId),
+            invites: state.invites.filter((invite) => invite.chatId !== chatId),
+            chatSecretsByChatId: nextSecrets,
+            currentChatId: state.currentChatId === chatId ? "" : state.currentChatId
+          };
+        });
+      },
+      clearAllChats: () => {
+        set({
+          chats: [],
+          invites: [],
+          chatSecretsByChatId: {},
+          currentChatId: "",
+          loading: false
+        });
       }
     }),
     {

@@ -1,8 +1,11 @@
 import { ChevronRight } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useSettingsSections } from "@/features/settings/model/use-settings-sections";
+import { deleteOfflineDb } from "@/shared/lib/offline/db";
 import { signOutSupabase } from "@/shared/lib/supabase/messaging";
 import { useAuthStore } from "@/shared/model/auth-store";
+import { useChatStore } from "@/shared/model/chat-store";
+import { useMessageStore } from "@/shared/model/message-store";
 import { useUiStore } from "@/shared/model/ui-store";
 import { SectionCard } from "@/shared/ui/section-card";
 
@@ -10,8 +13,12 @@ export function SettingsList() {
   const items = useSettingsSections();
   const navigate = useNavigate();
   const signOut = useAuthStore((state) => state.signOut);
+  const clearAuth = useAuthStore((state) => state.clearAuth);
+  const clearAllChats = useChatStore((state) => state.clearAllChats);
+  const clearAllMessages = useMessageStore((state) => state.clearAllMessages);
   const setModalState = useUiStore((state) => state.setModalState);
   const setTheme = useUiStore((state) => state.setTheme);
+  const resetUi = useUiStore((state) => state.resetUi);
   const theme = useUiStore((state) => state.theme);
 
   function handleItemClick(label: string) {
@@ -60,6 +67,28 @@ export function SettingsList() {
           className="flex w-full items-center gap-3 px-4 py-4 text-left text-rose-500 transition hover:bg-rose-50 dark:hover:bg-rose-500/10"
         >
           Выйти из аккаунта
+        </button>
+        <button
+          type="button"
+          onClick={async () => {
+            const confirmed = window.confirm("Стереть все данные приложения без возможности восстановления?");
+            if (!confirmed) return;
+
+            await signOutSupabase().catch(() => undefined);
+            await deleteOfflineDb().catch(() => undefined);
+            clearAllMessages();
+            clearAllChats();
+            clearAuth();
+            resetUi();
+            localStorage.removeItem("achat-auth");
+            localStorage.removeItem("achat-ui");
+            localStorage.removeItem("achat-chats");
+            localStorage.removeItem("achat-messages");
+            navigate("/settings");
+          }}
+          className="flex w-full items-center gap-3 px-4 py-4 text-left text-rose-600 transition hover:bg-rose-50 dark:hover:bg-rose-500/10"
+        >
+          Полностью стереть данные
         </button>
       </div>
     </SectionCard>

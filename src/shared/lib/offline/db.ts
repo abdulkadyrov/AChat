@@ -36,3 +36,8 @@ export async function cacheMessages(messages: Message[]) {
 
   await tx.done;
 }
+
+export async function deleteOfflineDb() {
+  const { deleteDB } = await import("idb");
+  await deleteDB(DB_NAME);
+}

@@ -15,6 +15,7 @@ interface AuthState {
     avatarUrl?: string;
   }) => void;
   signOut: () => void;
+  clearAuth: () => void;
 }
 
 function buildLocalSession(): AuthSession {
@@ -63,7 +64,8 @@ export const useAuthStore = create<AuthState>()(
               }
             : state.user
         })),
-      signOut: () => set({ user: null, session: null })
+      signOut: () => set({ user: null, session: null }),
+      clearAuth: () => set({ user: null, session: null })
     }),
     {
       name: "achat-auth",

@@ -19,6 +19,7 @@ interface UiState {
   setReplyTo: (messageId: string | null) => void;
   setModalState: (value: UiState["modalState"]) => void;
   setMessageTtl: (value: MessageTTL) => void;
+  resetUi: () => void;
 }
 
 export const useUiStore = create<UiState>()(
@@ -31,7 +32,14 @@ export const useUiStore = create<UiState>()(
       setTheme: (theme) => set({ theme }),
       setReplyTo: (replyTo) => set({ replyTo }),
       setModalState: (modalState) => set({ modalState }),
-      setMessageTtl: (messageTtl) => set({ messageTtl })
+      setMessageTtl: (messageTtl) => set({ messageTtl }),
+      resetUi: () =>
+        set({
+          theme: "light",
+          replyTo: null,
+          modalState: null,
+          messageTtl: "7d"
+        })
     }),
     {
       name: "achat-ui",

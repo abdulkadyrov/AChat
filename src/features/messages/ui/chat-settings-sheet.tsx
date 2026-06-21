@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import type { Chat, MessageTTL } from "@/shared/types/domain";
 import { useChatStore } from "@/shared/model/chat-store";
 import { useUiStore } from "@/shared/model/ui-store";
-import { QrCodeCard } from "@/shared/ui/qr-code-card";
+import { AccessCodeCard } from "@/shared/ui/access-code-card";
 
 const ttlOptions: Array<{ value: MessageTTL; label: string }> = [
   { value: "off", label: "Выкл" },
@@ -16,13 +17,16 @@ interface ChatSettingsSheetProps {
 }
 
 export function ChatSettingsSheet({ chat }: ChatSettingsSheetProps) {
+  const navigate = useNavigate();
   const modalState = useUiStore((state) => state.modalState);
   const setModalState = useUiStore((state) => state.setModalState);
   const invites = useChatStore((state) => state.invites);
   const updateChatSettings = useChatStore((state) => state.updateChatSettings);
+  const deleteChat = useChatStore((state) => state.deleteChat);
   const [title, setTitle] = useState(chat.title);
   const [memberLimit, setMemberLimit] = useState(String(chat.memberLimit ?? 3));
   const [messageTtl, setMessageTtl] = useState<MessageTTL>(chat.messageTtl);
+  const [isDeleting, setDeleting] = useState(false);
 
   useEffect(() => {
     if (modalState === "chat-settings") {
@@ -77,7 +81,7 @@ export function ChatSettingsSheet({ chat }: ChatSettingsSheetProps) {
 
           {chat.type === "group" ? (
             <div>
-              <p className="mb-2 text-sm font-semibold">Лимит участников по QR</p>
+              <p className="mb-2 text-sm font-semibold">Количество разрешённых номеров</p>
               <input
                 type="number"
                 min={1}
@@ -95,10 +99,37 @@ export function ChatSettingsSheet({ chat }: ChatSettingsSheetProps) {
 
           {invite && (
             <div>
-              <p className="mb-2 text-sm font-semibold">QR-код приглашения</p>
-              <QrCodeCard value={invite.token} />
+              <p className="mb-2 text-sm font-semibold">Код приглашения</p>
+              <AccessCodeCard value={invite.accessCode} />
             </div>
           )}
+
+          <div className="rounded-2xl border border-rose-200/70 bg-rose-50 px-4 py-4 dark:border-rose-500/20 dark:bg-rose-500/10">
+            <p className="text-sm font-semibold text-rose-700 dark:text-rose-200">Полное удаление чата</p>
+            <p className="mt-1 text-sm text-rose-600 dark:text-rose-200/80">
+              Чат будет удалён из списка вместе с сообщениями и кодом доступа.
+            </p>
+            <button
+              type="button"
+              disabled={isDeleting}
+              onClick={async () => {
+                const confirmed = window.confirm(`Удалить чат "${chat.title}" полностью?`);
+                if (!confirmed) return;
+
+                setDeleting(true);
+                try {
+                  await deleteChat(chat.id);
+                  setModalState(null);
+                  navigate("/chats");
+                } finally {
+                  setDeleting(false);
+                }
+              }}
+              className="mt-4 w-full rounded-2xl bg-rose-600 px-4 py-3 font-semibold text-white transition disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {isDeleting ? "Удаляем чат..." : "Удалить чат полностью"}
+            </button>
+          </div>
         </div>
 
         <div className="mt-5 flex gap-3">

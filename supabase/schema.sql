@@ -15,6 +15,7 @@ create table if not exists public.chats (
   title text not null,
   owner_id uuid not null references public.users(id) on delete cascade,
   target_phone text,
+  allowed_phones text[] not null default '{}',
   member_limit integer,
   message_ttl text not null default '7d' check (message_ttl in ('off', '24h', '7d', '30d')),
   created_at timestamptz not null default timezone('utc', now())
@@ -32,6 +33,9 @@ create table if not exists public.chat_invites (
   chat_id uuid not null references public.chats(id) on delete cascade,
   kind text not null check (kind in ('direct', 'group')),
   created_by uuid not null references public.users(id) on delete cascade,
+  access_code text not null unique,
+  chat_secret text not null default '',
+  allowed_phones text[] not null default '{}',
   allowed_phone text,
   max_participants integer not null default 1,
   used_count integer not null default 0,
@@ -99,6 +103,12 @@ drop policy if exists "owners can update chats" on public.chats;
 create policy "owners can update chats"
 on public.chats
 for update
+using (owner_id = auth.uid());
+
+drop policy if exists "owners can delete chats" on public.chats;
+create policy "owners can delete chats"
+on public.chats
+for delete
 using (owner_id = auth.uid());
 
 drop policy if exists "members can read memberships" on public.chat_members;
@@ -195,11 +205,10 @@ on public.messages
 for delete
 using (sender_id = auth.uid());
 
-create or replace function public.consume_chat_invite(
-  p_invite_id uuid,
+create or replace function public.consume_chat_invite_by_code(
+  p_access_code text,
   p_phone text
-)
-returns public.chats
+) returns jsonb
 language plpgsql
 security definer
 set search_path = public
@@ -208,29 +217,42 @@ declare
   v_invite public.chat_invites;
   v_chat public.chats;
   v_member_count integer;
+  v_normalized_phone text;
 begin
+  v_normalized_phone := regexp_replace(coalesce(p_phone, ''), '\D', '', 'g');
+
   select * into v_invite
   from public.chat_invites
-  where id = p_invite_id
+  where upper(access_code) = upper(p_access_code)
     and is_active = true;
 
   if not found then
-    raise exception 'Invite not found or inactive';
+    raise exception 'Code not found or inactive';
   end if;
 
   select * into v_chat
   from public.chats
   where id = v_invite.chat_id;
 
-  if v_invite.kind = 'direct' and coalesce(v_invite.allowed_phone, '') <> coalesce(p_phone, '') then
-    raise exception 'This QR code is bound to a different phone number';
+  if not (v_normalized_phone = any(v_invite.allowed_phones)) then
+    raise exception 'This code is not allowed for this phone number';
   end if;
 
   select count(*) into v_member_count
   from public.chat_members
   where chat_id = v_invite.chat_id;
 
-  if v_invite.kind = 'group' and v_member_count - 1 >= v_invite.max_participants then
+  if exists (
+    select 1
+    from public.chat_members cm
+    join public.users u on u.id = cm.user_id
+    where cm.chat_id = v_invite.chat_id
+      and regexp_replace(coalesce(u.phone, ''), '\D', '', 'g') = v_normalized_phone
+  ) then
+    raise exception 'This phone number is already used in the chat';
+  end if;
+
+  if v_member_count - 1 >= v_invite.max_participants then
     raise exception 'Group participant limit reached';
   end if;
 
@@ -238,18 +260,14 @@ begin
   values (v_invite.chat_id, auth.uid())
   on conflict do nothing;
 
-  if v_invite.kind = 'direct' then
-    update public.chat_invites
-    set used_count = 1,
-        is_active = false
-    where id = p_invite_id;
-  else
-    update public.chat_invites
-    set used_count = used_count + 1
-    where id = p_invite_id;
-  end if;
-
-  return v_chat;
+  update public.chat_invites
+  set used_count = used_count + 1,
+      is_active = case when v_member_count >= v_invite.max_participants then false else is_active end
+  where id = v_invite.id;
+  return jsonb_build_object(
+    'chat', row_to_json(v_chat),
+    'chat_secret', v_invite.chat_secret
+  );
 end;
 $$;
 

@@ -5,7 +5,7 @@ import {
   generateSharedSecret,
   importDeviceKey
 } from "@/shared/lib/crypto/achat-crypto";
-import { buildInviteToken, normalizePhone } from "@/shared/lib/invite/token";
+import { buildInviteToken, generateAccessCode, normalizePhone } from "@/shared/lib/invite/token";
 import { computeExpiresAt } from "@/shared/lib/ttl/messages";
 import { supabase } from "@/shared/lib/supabase/client";
 import type { Chat, ChatInvite, Message, MessageTTL, UserProfile } from "@/shared/types/domain";
@@ -16,6 +16,7 @@ type ChatRow = {
   title: string;
   owner_id: string;
   target_phone: string | null;
+  allowed_phones: string[] | null;
   member_limit: number | null;
   message_ttl: MessageTTL;
   created_at: string;
@@ -34,7 +35,14 @@ type MessageRow = {
   media_path: string | null;
 };
 
-function mapChatRow(row: ChatRow, memberIds: string[], avatarGroup: string[], inviteId: string | null): Chat {
+function mapChatRow(
+  row: ChatRow,
+  memberIds: string[],
+  memberPhones: string[],
+  avatarGroup: string[],
+  inviteId: string | null
+): Chat {
+  const allowedPhones = row.allowed_phones ?? (row.target_phone ? [row.target_phone] : []);
   return {
     id: row.id,
     familyId: row.id,
@@ -46,9 +54,10 @@ function mapChatRow(row: ChatRow, memberIds: string[], avatarGroup: string[], in
     lastMessageAt: row.created_at,
     ownerId: row.owner_id,
     participantIds: memberIds,
+    participantPhones: memberPhones,
     memberLimit: row.member_limit,
     inviteId,
-    targetPhone: row.target_phone,
+    targetPhone: allowedPhones[0] ?? row.target_phone,
     messageTtl: row.message_ttl
   };
 }
@@ -84,13 +93,14 @@ export async function createRemoteChat(input: {
   title: string;
   type: Chat["type"];
   user: UserProfile;
-  memberLimit: number | null;
-  targetPhone: string | null;
+  allowedPhones: string[];
 }) {
   const ownerId = await ensureSupabaseIdentity(input.user);
   const chatSecret = await generateSharedSecret();
   const inviteId = crypto.randomUUID();
   const createdAt = new Date().toISOString();
+  const allowedPhones = input.allowedPhones.map((phone) => normalizePhone(phone));
+  const accessCode = generateAccessCode();
 
   const { data: chatRow, error: chatError } = await supabase
     .from("chats")
@@ -99,8 +109,9 @@ export async function createRemoteChat(input: {
       type: input.type,
       title: input.title.trim(),
       owner_id: ownerId,
-      target_phone: input.targetPhone ? normalizePhone(input.targetPhone) : null,
-      member_limit: input.memberLimit,
+      target_phone: allowedPhones[0] ?? null,
+      allowed_phones: allowedPhones,
+      member_limit: allowedPhones.length,
       message_ttl: "7d"
     })
     .select()
@@ -121,8 +132,10 @@ export async function createRemoteChat(input: {
     title: input.title.trim(),
     createdBy: ownerId,
     createdByPhone: normalizePhone(input.user.phone),
-    allowedPhone: input.targetPhone ? normalizePhone(input.targetPhone) : null,
-    maxParticipants: input.type === "group" ? Math.max(1, input.memberLimit ?? 1) : 1,
+    accessCode,
+    allowedPhones,
+    allowedPhone: allowedPhones[0] ?? null,
+    maxParticipants: allowedPhones.length,
     createdAt,
     chatSecret
   };
@@ -136,6 +149,9 @@ export async function createRemoteChat(input: {
     chat_id: invite.chatId,
     kind: invite.kind,
     created_by: invite.createdBy,
+    access_code: invite.accessCode,
+    chat_secret: invite.chatSecret,
+    allowed_phones: invite.allowedPhones,
     allowed_phone: invite.allowedPhone,
     max_participants: invite.maxParticipants,
     used_count: 0,
@@ -143,27 +159,39 @@ export async function createRemoteChat(input: {
   });
   if (inviteError) throw inviteError;
 
-  const chat = mapChatRow(chatRow, [ownerId], [input.user.avatarUrl], invite.id);
+  const chat = mapChatRow(
+    chatRow,
+    [ownerId],
+    [normalizePhone(input.user.phone)],
+    [input.user.avatarUrl],
+    invite.id
+  );
   return { chat, invite, chatSecret };
 }
 
-export async function joinRemoteChatByInvite(input: {
-  inviteId: string;
-  chatSecret: string;
+export async function joinRemoteChatByCode(input: {
+  accessCode: string;
   user: UserProfile;
 }) {
   const remoteUserId = await ensureSupabaseIdentity(input.user);
-  const { data, error } = await supabase.rpc("consume_chat_invite", {
-    p_invite_id: input.inviteId,
+  const normalizedPhone = normalizePhone(input.user.phone);
+  const { data, error } = await supabase.rpc("consume_chat_invite_by_code", {
+    p_access_code: input.accessCode,
     p_phone: normalizePhone(input.user.phone)
   });
 
   if (error || !data) throw error ?? new Error("Unable to join invite");
 
-  const chatRow = data as ChatRow;
+  const payload = data as { chat: ChatRow; chat_secret: string };
   return {
-    chat: mapChatRow(chatRow, [remoteUserId], [input.user.avatarUrl], input.inviteId),
-    chatSecret: input.chatSecret
+    chat: mapChatRow(
+      payload.chat,
+      [remoteUserId],
+      [normalizedPhone],
+      [input.user.avatarUrl],
+      null
+    ),
+    chatSecret: payload.chat_secret
   };
 }
 
@@ -187,11 +215,11 @@ export async function fetchRemoteChats(user: UserProfile) {
 
   const { data: allMembers } = await supabase
     .from("chat_members")
-    .select("chat_id,user_id,users(avatar_url)")
+    .select("chat_id,user_id,users(avatar_url,phone)")
     .in("chat_id", chatIds);
   const { data: invites } = await supabase
     .from("chat_invites")
-    .select("id,chat_id")
+    .select("id,chat_id,access_code,allowed_phones,allowed_phone,max_participants")
     .in("chat_id", chatIds);
 
   return (chats as ChatRow[]).map((row) => {
@@ -201,8 +229,11 @@ export async function fetchRemoteChats(user: UserProfile) {
       .filter(Boolean)
       .slice(0, 3);
     const memberIds = members.map((member) => member.user_id);
+    const memberPhones = members
+      .map((member: any) => normalizePhone(member.users?.phone ?? ""))
+      .filter(Boolean);
     const inviteId = (invites ?? []).find((item: any) => item.chat_id === row.id)?.id ?? null;
-    return mapChatRow(row, memberIds, avatars, inviteId);
+    return mapChatRow(row, memberIds, memberPhones, avatars, inviteId);
   });
 }
 
@@ -381,6 +412,11 @@ export async function updateRemoteChatSettings(input: {
       .eq("chat_id", input.chatId);
     if (inviteError) throw inviteError;
   }
+}
+
+export async function deleteRemoteChat(chatId: string) {
+  const { error } = await supabase.from("chats").delete().eq("id", chatId);
+  if (error) throw error;
 }
 
 export function subscribeToRemoteMessages(

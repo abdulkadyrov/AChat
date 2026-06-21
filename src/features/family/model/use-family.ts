@@ -1,18 +1,28 @@
-import { getUserById } from "@/entities/user/model/selectors";
-import { demoFamily, demoMembers } from "@/shared/mocks/demo-data";
 import { useAuthStore } from "@/shared/model/auth-store";
 
 export function useFamily() {
   const currentUser = useAuthStore((state) => state.user);
 
   return {
-    family: demoFamily,
-    members: demoMembers.map((member) => ({
-      ...member,
-      user:
-        member.role === "owner" && currentUser
-          ? currentUser
-          : getUserById(member.userId, currentUser)
-    }))
+    family: currentUser
+      ? {
+          id: "family-main",
+          name: currentUser.name,
+          ownerId: currentUser.id,
+          inviteCode: "LOCAL-FAMILY"
+        }
+      : null,
+    members: currentUser
+      ? [
+          {
+            id: `member-${currentUser.id}`,
+            familyId: "family-main",
+            userId: currentUser.id,
+            role: "owner" as const,
+            status: "online" as const,
+            user: currentUser
+          }
+        ]
+      : []
   };
 }

@@ -13,7 +13,7 @@ export function EmptyChatsState({ onCreate }: EmptyChatsStateProps) {
       </div>
       <h2 className="mt-4 text-xl font-extrabold tracking-[-0.03em]">Пока нет чатов</h2>
       <p className="subtle-text mx-auto mt-2 max-w-72">
-        Создайте личный чат или группу через кнопку плюс. Для личного чата QR можно привязать к конкретному номеру.
+        Создайте личный чат или группу через кнопку плюс. Для входа используется 6-значный код доступа.
       </p>
       <button
         type="button"

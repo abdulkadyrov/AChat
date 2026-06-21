@@ -39,6 +39,7 @@ export interface Chat {
   lastMessageAt: string;
   ownerId: string;
   participantIds: string[];
+  participantPhones: string[];
   memberLimit: number | null;
   inviteId: string | null;
   targetPhone: string | null;
@@ -52,6 +53,8 @@ export interface ChatInvite {
   title: string;
   createdBy: string;
   createdByPhone: string;
+  accessCode: string;
+  allowedPhones: string[];
   allowedPhone: string | null;
   maxParticipants: number;
   createdAt: string;

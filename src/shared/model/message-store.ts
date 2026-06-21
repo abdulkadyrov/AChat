@@ -8,6 +8,8 @@ interface MessageState {
   setMessages: (chatId: string, messages: Message[]) => void;
   enqueueMessage: (message: Message) => void;
   removeMessage: (chatId: string, messageId: string) => void;
+  clearChatMessages: (chatId: string) => void;
+  clearAllMessages: () => void;
   setSendingState: (state: MessageState["sendingState"]) => void;
 }
 
@@ -39,6 +41,20 @@ export const useMessageStore = create<MessageState>()(
             [chatId]: (state.messagesByChatId[chatId] ?? []).filter((message) => message.id !== messageId)
           }
         })),
+      clearChatMessages: (chatId) =>
+        set((state) => {
+          const nextMessagesByChatId = { ...state.messagesByChatId };
+          delete nextMessagesByChatId[chatId];
+
+          return {
+            messagesByChatId: nextMessagesByChatId
+          };
+        }),
+      clearAllMessages: () =>
+        set({
+          messagesByChatId: {},
+          sendingState: "idle"
+        }),
       setSendingState: (sendingState) => set({ sendingState })
     }),
     {
