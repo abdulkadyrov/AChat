@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Camera, ImagePlus } from "lucide-react";
 import QrScanner from "qr-scanner";
 import { useNavigate } from "react-router-dom";
@@ -18,12 +18,18 @@ export function JoinChatScanner({ open, onClose }: JoinChatScannerProps) {
   const scannerRef = useRef<QrScanner | null>(null);
   const user = useAuthStore((state) => state.user);
   const joinByInviteToken = useChatStore((state) => state.joinByInviteToken);
+  const userRef = useRef(user);
+  const joinRef = useRef(joinByInviteToken);
   const [error, setError] = useState("");
   const [isCameraReady, setCameraReady] = useState(false);
-  const currentUser = useMemo(() => user, [user]);
 
   useEffect(() => {
-    if (!open || !videoRef.current || !currentUser) return;
+    userRef.current = user;
+    joinRef.current = joinByInviteToken;
+  }, [joinByInviteToken, user]);
+
+  useEffect(() => {
+    if (!open || !videoRef.current || !userRef.current || scannerRef.current) return;
 
     let mounted = true;
     setError("");
@@ -31,8 +37,10 @@ export function JoinChatScanner({ open, onClose }: JoinChatScannerProps) {
     const scanner = new QrScanner(
       videoRef.current,
       (result) => {
+        const currentUser = userRef.current;
+        if (!currentUser) return;
         const token = typeof result === "string" ? result : result.data;
-        joinByInviteToken({ token, user: currentUser }).then((joined) => {
+        joinRef.current({ token, user: currentUser }).then((joined) => {
           if (joined.ok) {
             handleClose();
             navigate(`/chat/${joined.chatId}`);
@@ -77,9 +85,9 @@ export function JoinChatScanner({ open, onClose }: JoinChatScannerProps) {
       scannerRef.current = null;
       setCameraReady(false);
     };
-  }, [open, currentUser, joinByInviteToken, navigate]);
+  }, [open, navigate]);
 
-  if (!open || !currentUser) return null;
+  if (!open || !user) return null;
 
   function handleClose() {
     scannerRef.current?.stop();
@@ -87,10 +95,11 @@ export function JoinChatScanner({ open, onClose }: JoinChatScannerProps) {
   }
 
   async function handleGalleryPick(file: File | null) {
+    const currentUser = userRef.current;
     if (!file || !currentUser) return;
     try {
       const result = await scanQrFromImage(file);
-      const joined = await joinByInviteToken({ token: result.data, user: currentUser });
+      const joined = await joinRef.current({ token: result.data, user: currentUser });
       if (joined.ok) {
         handleClose();
         navigate(`/chat/${joined.chatId}`);
