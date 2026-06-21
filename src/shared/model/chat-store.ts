@@ -1,5 +1,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import { generateSharedSecret } from "@/shared/lib/crypto/achat-crypto";
+import { buildInviteToken, normalizePhone } from "@/shared/lib/invite/token";
 import { parseInviteToken } from "@/shared/lib/invite/token";
 import {
   createRemoteChat,
@@ -46,6 +48,54 @@ interface ChatState {
   }) => Promise<void>;
 }
 
+async function buildLocalChatInvite(input: {
+  title: string;
+  type: Chat["type"];
+  user: UserProfile;
+  memberLimit: number | null;
+  targetPhone: string | null;
+}) {
+  const chatId = crypto.randomUUID();
+  const inviteId = crypto.randomUUID();
+  const createdAt = new Date().toISOString();
+  const chatSecret = await generateSharedSecret();
+
+  const invite: ChatInvite = {
+    id: inviteId,
+    chatId,
+    kind: input.type,
+    title: input.title.trim(),
+    createdBy: input.user.id,
+    createdByPhone: normalizePhone(input.user.phone),
+    allowedPhone: input.targetPhone ? normalizePhone(input.targetPhone) : null,
+    maxParticipants: input.type === "group" ? Math.max(1, input.memberLimit ?? 1) : 1,
+    createdAt,
+    chatSecret,
+    token: ""
+  };
+
+  invite.token = buildInviteToken(invite);
+
+  const chat: Chat = {
+    id: chatId,
+    familyId: chatId,
+    type: input.type,
+    title: input.title.trim(),
+    subtitle: input.type === "group" ? "Участников: 1" : "Защищенный чат",
+    avatarGroup: [input.user.avatarUrl],
+    unreadCount: 0,
+    lastMessageAt: createdAt,
+    ownerId: input.user.id,
+    participantIds: [input.user.id],
+    memberLimit: input.memberLimit,
+    inviteId,
+    targetPhone: invite.allowedPhone,
+    messageTtl: "7d"
+  };
+
+  return { chat, invite, chatSecret };
+}
+
 export const useChatStore = create<ChatState>()(
   persist(
     (set, get) => ({
@@ -77,7 +127,15 @@ export const useChatStore = create<ChatState>()(
           memberLimit: 1,
           targetPhone: recipientPhone,
           user
-        });
+        }).catch(() =>
+          buildLocalChatInvite({
+            title,
+            type: "direct",
+            memberLimit: 1,
+            targetPhone: recipientPhone,
+            user
+          })
+        );
 
         set((state) => ({
           chats: [chat, ...state.chats.filter((item) => item.id !== chat.id)],
@@ -98,7 +156,15 @@ export const useChatStore = create<ChatState>()(
           memberLimit,
           targetPhone: null,
           user
-        });
+        }).catch(() =>
+          buildLocalChatInvite({
+            title,
+            type: "group",
+            memberLimit,
+            targetPhone: null,
+            user
+          })
+        );
 
         set((state) => ({
           chats: [chat, ...state.chats.filter((item) => item.id !== chat.id)],
