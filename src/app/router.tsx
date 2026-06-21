@@ -1,13 +1,11 @@
-import { createBrowserRouter, Navigate } from "react-router-dom";
+import { createHashRouter, Navigate } from "react-router-dom";
 import { RootLayout } from "@/app/root-layout";
 import { ChatsPage } from "@/pages/chats/ui/chats-page";
 import { ChatRoomPage } from "@/pages/chat-room/ui/chat-room-page";
 import { FamilyPage } from "@/pages/family/ui/family-page";
 import { SettingsPage } from "@/pages/settings/ui/settings-page";
 
-const basename = import.meta.env.BASE_URL.replace(/\/$/, "");
-
-export const router = createBrowserRouter([
+export const router = createHashRouter([
   {
     path: "/",
     element: <RootLayout />,
@@ -19,6 +17,4 @@ export const router = createBrowserRouter([
       { path: "settings", element: <SettingsPage /> }
     ]
   }
-], {
-  basename
-});
+]);
