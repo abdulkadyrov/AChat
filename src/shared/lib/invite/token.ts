@@ -11,6 +11,7 @@ interface InvitePayload {
   allowedPhone: string | null;
   maxParticipants: number;
   createdAt: string;
+  chatSecret: string;
 }
 
 function toBase64(value: string) {
@@ -36,7 +37,8 @@ export function buildInviteToken(invite: Omit<ChatInvite, "token">) {
     createdByPhone: invite.createdByPhone,
     allowedPhone: invite.allowedPhone,
     maxParticipants: invite.maxParticipants,
-    createdAt: invite.createdAt
+    createdAt: invite.createdAt,
+    chatSecret: invite.chatSecret
   };
 
   return toBase64(JSON.stringify(payload));

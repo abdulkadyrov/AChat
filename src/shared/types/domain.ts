@@ -55,6 +55,7 @@ export interface ChatInvite {
   allowedPhone: string | null;
   maxParticipants: number;
   createdAt: string;
+  chatSecret: string;
   token: string;
 }
 
@@ -70,6 +71,7 @@ export interface Message {
   replyTo: string | null;
   preview?: string;
   mediaPath?: string;
+  mediaDataUrl?: string;
   durationSec?: number;
   status?: "sending" | "sent" | "read";
 }

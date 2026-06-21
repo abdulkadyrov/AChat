@@ -1,6 +1,7 @@
 import { ChevronRight } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useSettingsSections } from "@/features/settings/model/use-settings-sections";
+import { signOutSupabase } from "@/shared/lib/supabase/messaging";
 import { useAuthStore } from "@/shared/model/auth-store";
 import { useUiStore } from "@/shared/model/ui-store";
 import { SectionCard } from "@/shared/ui/section-card";
@@ -51,7 +52,8 @@ export function SettingsList() {
         })}
         <button
           type="button"
-          onClick={() => {
+          onClick={async () => {
+            await signOutSupabase();
             signOut();
             navigate("/chats");
           }}

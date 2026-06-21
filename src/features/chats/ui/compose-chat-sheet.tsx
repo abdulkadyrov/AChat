@@ -38,9 +38,9 @@ export function ComposeChatSheet({ open, onClose }: ComposeChatSheetProps) {
     onClose();
   }
 
-  function handleDirectCreate() {
+  async function handleDirectCreate() {
     if (!title.trim() || !recipientPhone.trim()) return;
-    const createdInvite = createDirectChat({
+    const createdInvite = await createDirectChat({
       title,
       recipientPhone,
       user: currentUser
@@ -50,9 +50,9 @@ export function ComposeChatSheet({ open, onClose }: ComposeChatSheetProps) {
     navigate(`/chat/${createdInvite.chatId}`);
   }
 
-  function handleGroupCreate() {
+  async function handleGroupCreate() {
     if (!title.trim()) return;
-    const createdInvite = createGroupChat({
+    const createdInvite = await createGroupChat({
       title,
       memberLimit: Number(groupLimit) || 1,
       user: currentUser

@@ -30,13 +30,14 @@ export function JoinChatScanner({ open, onClose }: JoinChatScannerProps) {
       videoRef.current,
       (result) => {
         const token = typeof result === "string" ? result : result.data;
-        const joined = joinByInviteToken({ token, user: currentUser });
-        if (joined.ok) {
-          handleClose();
-          navigate(`/chat/${joined.chatId}`);
-        } else {
-          setError(joined.reason);
-        }
+        joinByInviteToken({ token, user: currentUser }).then((joined) => {
+          if (joined.ok) {
+            handleClose();
+            navigate(`/chat/${joined.chatId}`);
+          } else {
+            setError(joined.reason);
+          }
+        });
       },
       {
         highlightScanRegion: true,
@@ -75,7 +76,7 @@ export function JoinChatScanner({ open, onClose }: JoinChatScannerProps) {
     if (!file || !currentUser) return;
     try {
       const result = await scanQrFromImage(file);
-      const joined = joinByInviteToken({ token: result.data, user: currentUser });
+      const joined = await joinByInviteToken({ token: result.data, user: currentUser });
       if (joined.ok) {
         handleClose();
         navigate(`/chat/${joined.chatId}`);

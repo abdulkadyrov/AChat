@@ -111,8 +111,8 @@ export function ChatSettingsSheet({ chat }: ChatSettingsSheetProps) {
           </button>
           <button
             type="button"
-            onClick={() => {
-              updateChatSettings({
+            onClick={async () => {
+              await updateChatSettings({
                 chatId: chat.id,
                 title,
                 messageTtl,

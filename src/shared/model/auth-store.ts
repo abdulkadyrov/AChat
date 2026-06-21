@@ -6,6 +6,7 @@ interface AuthState {
   user: UserProfile | null;
   session: AuthSession | null;
   setSession: (user: UserProfile, session: AuthSession) => void;
+  setRemoteUserId: (userId: string) => void;
   signInLocal: (payload: { name: string; phone: string; about: string }) => void;
   updateProfile: (payload: {
     name: string;
@@ -34,10 +35,14 @@ export const useAuthStore = create<AuthState>()(
       user: null,
       session: null,
       setSession: (user, session) => set({ user, session }),
+      setRemoteUserId: (userId) =>
+        set((state) => ({
+          user: state.user ? { ...state.user, id: userId } : state.user
+        })),
       signInLocal: ({ name, phone, about }) =>
         set({
           user: {
-            id: "user-papa",
+            id: crypto.randomUUID(),
             name: name.trim(),
             phone: phone.trim(),
             about: about.trim(),

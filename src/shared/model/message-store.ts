@@ -5,7 +5,9 @@ import type { Message } from "@/shared/types/domain";
 interface MessageState {
   messagesByChatId: Record<string, Message[]>;
   sendingState: "idle" | "sending" | "error";
+  setMessages: (chatId: string, messages: Message[]) => void;
   enqueueMessage: (message: Message) => void;
+  removeMessage: (chatId: string, messageId: string) => void;
   setSendingState: (state: MessageState["sendingState"]) => void;
 }
 
@@ -14,11 +16,27 @@ export const useMessageStore = create<MessageState>()(
     (set) => ({
       messagesByChatId: {},
       sendingState: "idle",
+      setMessages: (chatId, messages) =>
+        set((state) => ({
+          messagesByChatId: {
+            ...state.messagesByChatId,
+            [chatId]: messages
+          }
+        })),
       enqueueMessage: (message) =>
         set((state) => ({
           messagesByChatId: {
             ...state.messagesByChatId,
-            [message.chatId]: [...(state.messagesByChatId[message.chatId] ?? []), message]
+            [message.chatId]: [...(state.messagesByChatId[message.chatId] ?? []), message].filter(
+              (item, index, arr) => arr.findIndex((candidate) => candidate.id === item.id) === index
+            )
+          }
+        })),
+      removeMessage: (chatId, messageId) =>
+        set((state) => ({
+          messagesByChatId: {
+            ...state.messagesByChatId,
+            [chatId]: (state.messagesByChatId[chatId] ?? []).filter((message) => message.id !== messageId)
           }
         })),
       setSendingState: (sendingState) => set({ sendingState })

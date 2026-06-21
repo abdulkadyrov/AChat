@@ -1,7 +1,13 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import { buildInviteToken, normalizePhone, parseInviteToken } from "@/shared/lib/invite/token";
-import type { Chat, ChatInvite, UserProfile } from "@/shared/types/domain";
+import { parseInviteToken } from "@/shared/lib/invite/token";
+import {
+  createRemoteChat,
+  fetchRemoteChats,
+  joinRemoteChatByInvite,
+  updateRemoteChatSettings
+} from "@/shared/lib/supabase/messaging";
+import type { Chat, ChatInvite, MessageTTL, UserProfile } from "@/shared/types/domain";
 
 interface CreateDirectInput {
   title: string;
@@ -23,48 +29,21 @@ interface JoinInviteInput {
 interface ChatState {
   chats: Chat[];
   invites: ChatInvite[];
+  chatSecretsByChatId: Record<string, string>;
   currentChatId: string;
+  loading: boolean;
   setCurrentChatId: (chatId: string) => void;
-  createDirectChat: (input: CreateDirectInput) => ChatInvite;
-  createGroupChat: (input: CreateGroupInput) => ChatInvite;
-  joinByInviteToken: (input: JoinInviteInput) => { ok: true; chatId: string } | { ok: false; reason: string };
+  hydrateChats: (user: UserProfile) => Promise<void>;
+  createDirectChat: (input: CreateDirectInput) => Promise<ChatInvite>;
+  createGroupChat: (input: CreateGroupInput) => Promise<ChatInvite>;
+  joinByInviteToken: (input: JoinInviteInput) => Promise<{ ok: true; chatId: string } | { ok: false; reason: string }>;
   updateGroupLimit: (chatId: string, memberLimit: number) => void;
   updateChatSettings: (input: {
     chatId: string;
     title: string;
-    messageTtl: Chat["messageTtl"];
+    messageTtl: MessageTTL;
     memberLimit?: number;
-  }) => void;
-}
-
-function buildBaseChat(input: {
-  id: string;
-  title: string;
-  type: Chat["type"];
-  user: UserProfile;
-  memberLimit: number | null;
-  inviteId: string;
-  targetPhone: string | null;
-}) {
-  const now = new Date().toISOString();
-
-  return {
-    id: input.id,
-    familyId: input.id,
-    type: input.type,
-    title: input.title.trim(),
-    subtitle: input.type === "group" ? "Группа создана" : "Приглашение создано",
-    avatarGroup: [input.user.avatarUrl],
-    unreadCount: 0,
-    lastMessageAt: now,
-    ownerId: input.user.id,
-    participantIds: [input.user.id],
-    memberLimit: input.memberLimit,
-    inviteId: input.inviteId,
-    targetPhone: input.targetPhone
-    ,
-    messageTtl: "7d"
-  } satisfies Chat;
+  }) => Promise<void>;
 }
 
 export const useChatStore = create<ChatState>()(
@@ -72,135 +51,94 @@ export const useChatStore = create<ChatState>()(
     (set, get) => ({
       chats: [],
       invites: [],
+      chatSecretsByChatId: {},
       currentChatId: "",
+      loading: false,
       setCurrentChatId: (chatId) => set({ currentChatId: chatId }),
-      createDirectChat: ({ title, recipientPhone, user }) => {
-        const chatId = crypto.randomUUID();
-        const inviteId = crypto.randomUUID();
-        const allowedPhone = normalizePhone(recipientPhone);
-        const draft = {
-          id: inviteId,
-          chatId,
-          kind: "direct" as const,
-          title: title.trim(),
-          createdBy: user.id,
-          createdByPhone: normalizePhone(user.phone),
-          allowedPhone,
-          maxParticipants: 1,
-          createdAt: new Date().toISOString()
-        };
-        const invite: ChatInvite = { ...draft, token: buildInviteToken(draft) };
-        const chat = buildBaseChat({
-          id: chatId,
+      hydrateChats: async (user) => {
+        set({ loading: true });
+        try {
+          const chats = await fetchRemoteChats(user);
+          set((state) => ({
+            chats: chats.map((chat) => {
+              const localInvite = state.invites.find((invite) => invite.chatId === chat.id);
+              return localInvite ? { ...chat, inviteId: localInvite.id } : chat;
+            }),
+            loading: false
+          }));
+        } catch {
+          set({ loading: false });
+        }
+      },
+      createDirectChat: async ({ title, recipientPhone, user }) => {
+        const { chat, invite, chatSecret } = await createRemoteChat({
           title,
           type: "direct",
-          user,
           memberLimit: 1,
-          inviteId,
-          targetPhone: allowedPhone
+          targetPhone: recipientPhone,
+          user
         });
 
         set((state) => ({
-          chats: [chat, ...state.chats],
-          invites: [invite, ...state.invites],
-          currentChatId: chatId
+          chats: [chat, ...state.chats.filter((item) => item.id !== chat.id)],
+          invites: [invite, ...state.invites.filter((item) => item.id !== invite.id)],
+          chatSecretsByChatId: {
+            ...state.chatSecretsByChatId,
+            [chat.id]: chatSecret
+          },
+          currentChatId: chat.id
         }));
 
         return invite;
       },
-      createGroupChat: ({ title, memberLimit, user }) => {
-        const chatId = crypto.randomUUID();
-        const inviteId = crypto.randomUUID();
-        const normalizedLimit = Math.max(1, Math.min(memberLimit, 50));
-        const draft = {
-          id: inviteId,
-          chatId,
-          kind: "group" as const,
-          title: title.trim(),
-          createdBy: user.id,
-          createdByPhone: normalizePhone(user.phone),
-          allowedPhone: null,
-          maxParticipants: normalizedLimit,
-          createdAt: new Date().toISOString()
-        };
-        const invite: ChatInvite = { ...draft, token: buildInviteToken(draft) };
-        const chat = buildBaseChat({
-          id: chatId,
+      createGroupChat: async ({ title, memberLimit, user }) => {
+        const { chat, invite, chatSecret } = await createRemoteChat({
           title,
           type: "group",
-          user,
-          memberLimit: normalizedLimit,
-          inviteId,
-          targetPhone: null
+          memberLimit,
+          targetPhone: null,
+          user
         });
 
         set((state) => ({
-          chats: [chat, ...state.chats],
-          invites: [invite, ...state.invites],
-          currentChatId: chatId
+          chats: [chat, ...state.chats.filter((item) => item.id !== chat.id)],
+          invites: [invite, ...state.invites.filter((item) => item.id !== invite.id)],
+          chatSecretsByChatId: {
+            ...state.chatSecretsByChatId,
+            [chat.id]: chatSecret
+          },
+          currentChatId: chat.id
         }));
 
         return invite;
       },
-      joinByInviteToken: ({ token, user }) => {
+      joinByInviteToken: async ({ token, user }) => {
         try {
           const payload = parseInviteToken(token.trim());
-          const normalizedUserPhone = normalizePhone(user.phone);
-
-          if (payload.kind === "direct" && payload.allowedPhone !== normalizedUserPhone) {
-            return { ok: false as const, reason: "Этот QR-код привязан к другому номеру телефона." };
-          }
-
-          const existingChat = get().chats.find((chat) => chat.inviteId === payload.inviteId);
-          if (existingChat && existingChat.participantIds.includes(user.id)) {
-            return { ok: false as const, reason: "Этот чат уже подключен на текущем устройстве." };
-          }
-
-          const chat: Chat = existingChat
-            ? {
-                ...existingChat,
-                participantIds: Array.from(new Set([...existingChat.participantIds, user.id])),
-                avatarGroup: Array.from(new Set([...existingChat.avatarGroup, user.avatarUrl])).slice(0, 3),
-                subtitle:
-                  payload.kind === "group"
-                    ? `Участников: ${Math.min(existingChat.participantIds.length + 1, payload.maxParticipants + 1)}`
-                    : "Подключение выполнено"
-              }
-            : {
-                id: payload.chatId,
-                familyId: payload.chatId,
-                type: payload.kind,
-                title: payload.title,
-                subtitle: payload.kind === "group" ? "Подключение по QR" : "Личный чат по QR",
-                avatarGroup: [user.avatarUrl],
-                unreadCount: 0,
-                lastMessageAt: new Date().toISOString(),
-                ownerId: payload.createdBy,
-                participantIds: [user.id],
-                memberLimit: payload.kind === "group" ? payload.maxParticipants : 1,
-                inviteId: payload.inviteId,
-                targetPhone: payload.allowedPhone,
-                messageTtl: "7d"
-              };
-
-          if (
-            chat.type === "group" &&
-            chat.memberLimit !== null &&
-            chat.participantIds.length - 1 > chat.memberLimit
-          ) {
-            return { ok: false as const, reason: "Лимит участников этой группы уже исчерпан." };
-          }
+          const { chat, chatSecret } = await joinRemoteChatByInvite({
+            inviteId: payload.inviteId,
+            chatSecret: payload.chatSecret,
+            user
+          });
 
           set((state) => ({
-            chats: existingChat
-              ? state.chats.map((item) => (item.id === chat.id ? chat : item))
-              : [chat, ...state.chats],
+            chats: [chat, ...state.chats.filter((item) => item.id !== chat.id)],
+            chatSecretsByChatId: {
+              ...state.chatSecretsByChatId,
+              [chat.id]: chatSecret
+            },
             currentChatId: chat.id
           }));
 
           return { ok: true as const, chatId: chat.id };
-        } catch {
-          return { ok: false as const, reason: "Не удалось прочитать QR-код или код приглашения." };
+        } catch (error) {
+          return {
+            ok: false as const,
+            reason:
+              error instanceof Error
+                ? error.message
+                : "Не удалось подключиться по QR-коду."
+          };
         }
       },
       updateGroupLimit: (chatId, memberLimit) =>
@@ -218,16 +156,18 @@ export const useChatStore = create<ChatState>()(
             invite.chatId === chatId && invite.kind === "group"
               ? {
                   ...invite,
-                  maxParticipants: Math.max(1, Math.min(memberLimit, 50)),
-                  token: buildInviteToken({
-                    ...invite,
-                    maxParticipants: Math.max(1, Math.min(memberLimit, 50))
-                  })
+                  maxParticipants: Math.max(1, Math.min(memberLimit, 50))
                 }
               : invite
           )
         })),
-      updateChatSettings: ({ chatId, title, messageTtl, memberLimit }) =>
+      updateChatSettings: async ({ chatId, title, messageTtl, memberLimit }) => {
+        await updateRemoteChatSettings({
+          chatId,
+          title,
+          messageTtl,
+          memberLimit
+        });
         set((state) => ({
           chats: state.chats.map((chat) =>
             chat.id === chatId
@@ -238,48 +178,31 @@ export const useChatStore = create<ChatState>()(
                   memberLimit:
                     chat.type === "group" && typeof memberLimit === "number"
                       ? Math.max(1, Math.min(memberLimit, 50))
-                      : chat.memberLimit,
-                  subtitle:
-                    chat.type === "group"
-                      ? `Лимит участников: ${
-                          typeof memberLimit === "number"
-                            ? Math.max(1, Math.min(memberLimit, 50))
-                            : chat.memberLimit ?? 1
-                        }`
-                      : `Личный чат для ${chat.targetPhone ?? "выбранного номера"}`
+                      : chat.memberLimit
                 }
               : chat
           ),
           invites: state.invites.map((invite) =>
-            invite.chatId === chatId && invite.kind === "group" && typeof memberLimit === "number"
+            invite.chatId === chatId
               ? {
                   ...invite,
                   title: title.trim(),
-                  maxParticipants: Math.max(1, Math.min(memberLimit, 50)),
-                  token: buildInviteToken({
-                    ...invite,
-                    title: title.trim(),
-                    maxParticipants: Math.max(1, Math.min(memberLimit, 50))
-                  })
+                  maxParticipants:
+                    invite.kind === "group" && typeof memberLimit === "number"
+                      ? Math.max(1, Math.min(memberLimit, 50))
+                      : invite.maxParticipants
                 }
-              : invite.chatId === chatId
-                ? {
-                    ...invite,
-                    title: title.trim(),
-                    token: buildInviteToken({
-                      ...invite,
-                      title: title.trim()
-                    })
-                  }
-                : invite
+              : invite
           )
-        }))
+        }));
+      }
     }),
     {
       name: "achat-chats",
       partialize: (state) => ({
         chats: state.chats,
         invites: state.invites,
+        chatSecretsByChatId: state.chatSecretsByChatId,
         currentChatId: state.currentChatId
       })
     }
