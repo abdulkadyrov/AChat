@@ -26,6 +26,8 @@ export function JoinChatScanner({ open, onClose }: JoinChatScannerProps) {
     if (!open || !videoRef.current || !currentUser) return;
 
     let mounted = true;
+    setError("");
+    setCameraReady(false);
     const scanner = new QrScanner(
       videoRef.current,
       (result) => {
@@ -42,7 +44,13 @@ export function JoinChatScanner({ open, onClose }: JoinChatScannerProps) {
       {
         highlightScanRegion: true,
         highlightCodeOutline: true,
-        maxScansPerSecond: 5
+        maxScansPerSecond: 5,
+        onDecodeError: (scanError) => {
+          const message = scanError instanceof Error ? scanError.message : String(scanError);
+          if (!/No QR code found/i.test(message)) {
+            setError(`Ошибка сканера: ${message}`);
+          }
+        }
       }
     );
 
@@ -52,8 +60,14 @@ export function JoinChatScanner({ open, onClose }: JoinChatScannerProps) {
       .then(() => {
         if (mounted) setCameraReady(true);
       })
-      .catch(() => {
-        if (mounted) setError("Не удалось включить камеру. Проверьте разрешение браузера.");
+      .catch((scanError) => {
+        if (!mounted) return;
+        const message = scanError instanceof Error ? scanError.message : String(scanError);
+        setError(
+          message
+            ? `Не удалось включить камеру: ${message}`
+            : "Не удалось включить камеру. Проверьте разрешение браузера."
+        );
       });
 
     return () => {
