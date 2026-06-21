@@ -37,6 +37,8 @@ VITE_SUPABASE_URL=
 VITE_SUPABASE_KEY=
 ```
 
+If these values are left empty, the app now falls back to local-only mode instead of crashing on startup. For realtime Supabase features on GitHub Pages, add both variables in the build environment used by your deployment workflow.
+
 ## Included MVP pieces
 
 - Chat list, chat room, family page, settings page
