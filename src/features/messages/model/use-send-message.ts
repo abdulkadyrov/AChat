@@ -1,4 +1,6 @@
 import { useMutation } from "@tanstack/react-query";
+import { queueOutgoingMessage } from "@/shared/lib/offline/db";
+import { computeExpiresAt } from "@/shared/lib/ttl/messages";
 import { useAuthStore } from "@/shared/model/auth-store";
 import { useChatStore } from "@/shared/model/chat-store";
 import { useMessageStore } from "@/shared/model/message-store";
@@ -7,10 +9,40 @@ import {
   sendRemoteTextMessage
 } from "@/shared/lib/supabase/messaging";
 import { useUiStore } from "@/shared/model/ui-store";
+import type { Message, MessageTTL, MessageType } from "@/shared/types/domain";
 
 interface SendMessageInput {
   chatId: string;
   content: string;
+}
+
+function buildLocalMessage(input: {
+  chatId: string;
+  senderId: string;
+  ttl: MessageTTL;
+  type: Extract<MessageType, "text" | "image" | "voice">;
+  preview: string;
+  dataUrl?: string;
+  durationSec?: number;
+  replyTo?: string | null;
+}): Message {
+  const createdAt = new Date().toISOString();
+
+  return {
+    id: crypto.randomUUID(),
+    chatId: input.chatId,
+    senderId: input.senderId,
+    ciphertext: "",
+    iv: "",
+    type: input.type,
+    createdAt,
+    expiresAt: computeExpiresAt(createdAt, input.ttl),
+    replyTo: input.replyTo ?? null,
+    preview: input.preview,
+    mediaDataUrl: input.dataUrl,
+    durationSec: input.durationSec,
+    status: "sent"
+  };
 }
 
 export function useSendMessage() {
@@ -34,18 +66,33 @@ export function useSendMessage() {
       const chat = chats.find((item) => item.id === chatId);
       const ttl = chat?.messageTtl ?? messageTtl;
       const chatSecret = chatSecretsByChatId[chatId];
-      if (!chatSecret) {
-        throw new Error("Missing chat secret on this device");
-      }
-
-      const message = await sendRemoteTextMessage({
+      const fallbackMessage = buildLocalMessage({
         chatId,
-        user,
-        chatSecret,
-        content,
+        senderId: user.id,
         ttl,
+        type: "text",
+        preview: content,
         replyTo
       });
+
+      let message = fallbackMessage;
+      if (chatSecret) {
+        try {
+          message = await sendRemoteTextMessage({
+            chatId,
+            user,
+            chatSecret,
+            content,
+            ttl,
+            replyTo
+          });
+        } catch {
+          await queueOutgoingMessage(fallbackMessage).catch(() => undefined);
+        }
+      } else {
+        await queueOutgoingMessage(fallbackMessage).catch(() => undefined);
+      }
+
       enqueueMessage(message);
       setReplyTo(null);
       setSendingState("idle");
@@ -81,15 +128,34 @@ export function useSendMediaMessage() {
       const chat = chats.find((item) => item.id === input.chatId);
       const ttl = chat?.messageTtl ?? messageTtl;
       const chatSecret = chatSecretsByChatId[input.chatId];
-      if (!chatSecret) throw new Error("Missing chat secret on this device");
-
-      const message = await sendRemoteMediaMessage({
-        ...input,
-        user,
-        chatSecret,
+      const fallbackMessage = buildLocalMessage({
+        chatId: input.chatId,
+        senderId: user.id,
         ttl,
+        type: input.type,
+        preview: input.preview,
+        dataUrl: input.dataUrl,
+        durationSec: input.durationSec,
         replyTo
       });
+
+      let message = fallbackMessage;
+      if (chatSecret) {
+        try {
+          message = await sendRemoteMediaMessage({
+            ...input,
+            user,
+            chatSecret,
+            ttl,
+            replyTo
+          });
+        } catch {
+          await queueOutgoingMessage(fallbackMessage).catch(() => undefined);
+        }
+      } else {
+        await queueOutgoingMessage(fallbackMessage).catch(() => undefined);
+      }
+
       enqueueMessage(message);
       setReplyTo(null);
       setSendingState("idle");
