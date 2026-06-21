@@ -1,10 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import { Camera, ImagePlus } from "lucide-react";
-import QrScanner from "qr-scanner";
 import { useNavigate } from "react-router-dom";
 import { useAuthStore } from "@/shared/model/auth-store";
 import { useChatStore } from "@/shared/model/chat-store";
-import { scanQrFromImage } from "@/shared/lib/qr/scan-qr";
+import { createQrScanner, scanQrFromImage } from "@/shared/lib/qr/scan-qr";
 
 interface JoinChatScannerProps {
   open: boolean;
@@ -15,7 +14,7 @@ export function JoinChatScanner({ open, onClose }: JoinChatScannerProps) {
   const navigate = useNavigate();
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
-  const scannerRef = useRef<QrScanner | null>(null);
+  const scannerRef = useRef<{ stop: () => void; destroy: () => void } | null>(null);
   const user = useAuthStore((state) => state.user);
   const joinByInviteToken = useChatStore((state) => state.joinByInviteToken);
   const userRef = useRef(user);
@@ -34,7 +33,8 @@ export function JoinChatScanner({ open, onClose }: JoinChatScannerProps) {
     let mounted = true;
     setError("");
     setCameraReady(false);
-    const scanner = new QrScanner(
+
+    createQrScanner(
       videoRef.current,
       (result) => {
         const currentUser = userRef.current;
@@ -49,24 +49,22 @@ export function JoinChatScanner({ open, onClose }: JoinChatScannerProps) {
           }
         });
       },
-      {
-        highlightScanRegion: true,
-        highlightCodeOutline: true,
-        maxScansPerSecond: 5,
-        onDecodeError: (scanError) => {
-          const message = scanError instanceof Error ? scanError.message : String(scanError);
-          if (!/No QR code found/i.test(message)) {
-            setError(`Ошибка сканера: ${message}`);
-          }
+      (scanError) => {
+        const message = scanError instanceof Error ? scanError.message : String(scanError);
+        if (!/No QR code found/i.test(message)) {
+          setError(`Ошибка сканера: ${message}`);
         }
       }
-    );
-
-    scannerRef.current = scanner;
-    scanner
-      .start()
-      .then(() => {
-        if (mounted) setCameraReady(true);
+    )
+      .then((scanner) => {
+        if (!mounted) {
+          scanner.destroy();
+          return;
+        }
+        scannerRef.current = scanner;
+        return scanner.start().then(() => {
+          if (mounted) setCameraReady(true);
+        });
       })
       .catch((scanError) => {
         if (!mounted) return;
@@ -80,8 +78,8 @@ export function JoinChatScanner({ open, onClose }: JoinChatScannerProps) {
 
     return () => {
       mounted = false;
-      scanner.stop();
-      scanner.destroy();
+      scannerRef.current?.stop();
+      scannerRef.current?.destroy();
       scannerRef.current = null;
       setCameraReady(false);
     };
