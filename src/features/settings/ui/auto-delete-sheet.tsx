@@ -1,5 +1,6 @@
 import { Check } from "lucide-react";
 import { useUiStore } from "@/shared/model/ui-store";
+import type { UiState } from "@/shared/model/ui-store";
 import type { MessageTTL } from "@/shared/types/domain";
 
 const ttlOptions: Array<{ value: MessageTTL; label: string }> = [
@@ -10,10 +11,10 @@ const ttlOptions: Array<{ value: MessageTTL; label: string }> = [
 ];
 
 export function AutoDeleteSheet() {
-  const modalState = useUiStore((state) => state.modalState);
-  const messageTtl = useUiStore((state) => state.messageTtl);
-  const setMessageTtl = useUiStore((state) => state.setMessageTtl);
-  const setModalState = useUiStore((state) => state.setModalState);
+  const modalState = useUiStore((state: UiState) => state.modalState);
+  const messageTtl = useUiStore((state: UiState) => state.messageTtl);
+  const setMessageTtl = useUiStore((state: UiState) => state.setMessageTtl);
+  const setModalState = useUiStore((state: UiState) => state.setModalState);
 
   if (modalState !== "auto-delete") return null;
 

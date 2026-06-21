@@ -2,8 +2,8 @@ import { useRef, useState } from "react";
 import { Camera, Mic, Plus, Send, Smile, Square, X } from "lucide-react";
 import { useSendMediaMessage, useSendMessage } from "@/features/messages/model/use-send-message";
 import { IconButton } from "@/shared/ui/icon-button";
-import { useMessageStore } from "@/shared/model/message-store";
-import { useUiStore } from "@/shared/model/ui-store";
+import { useMessageStore, type MessageState } from "@/shared/model/message-store";
+import { useUiStore, type UiState } from "@/shared/model/ui-store";
 
 interface MessageInputProps {
   chatId: string;
@@ -25,9 +25,9 @@ export function MessageInput({ chatId, replyPreview }: MessageInputProps) {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
-  const sendingState = useMessageStore((state) => state.sendingState);
-  const replyTo = useUiStore((state) => state.replyTo);
-  const setReplyTo = useUiStore((state) => state.setReplyTo);
+  const sendingState = useMessageStore((state: MessageState) => state.sendingState);
+  const replyTo = useUiStore((state: UiState) => state.replyTo);
+  const setReplyTo = useUiStore((state: UiState) => state.setReplyTo);
   const sendMessage = useSendMessage();
   const sendMediaMessage = useSendMediaMessage();
 

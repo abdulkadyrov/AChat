@@ -1,15 +1,16 @@
 import { Settings, Users } from "lucide-react";
 import { Link } from "react-router-dom";
-import { useChatStore } from "@/shared/model/chat-store";
+import { useChatStore, type ChatState } from "@/shared/model/chat-store";
 import { ManageChatsSheet } from "@/features/chats/ui/manage-chats-sheet";
 import { SectionCard } from "@/shared/ui/section-card";
 import { useState } from "react";
+import type { Chat, ChatInvite } from "@/shared/types/domain";
 
 export function FamilyPage() {
   const [manageOpen, setManageOpen] = useState(false);
-  const chats = useChatStore((state) => state.chats);
-  const invites = useChatStore((state) => state.invites);
-  const groups = chats.filter((chat) => chat.type === "group");
+  const chats = useChatStore((state: ChatState) => state.chats);
+  const invites = useChatStore((state: ChatState) => state.invites);
+  const groups = chats.filter((chat: Chat) => chat.type === "group");
 
   return (
     <>
@@ -38,8 +39,8 @@ export function FamilyPage() {
           </SectionCard>
         ) : (
           <div className="space-y-3">
-            {groups.map((group) => {
-              const invite = invites.find((item) => item.chatId === group.id);
+            {groups.map((group: Chat) => {
+              const invite = invites.find((item: ChatInvite) => item.chatId === group.id);
 
               return (
                 <SectionCard key={group.id}>

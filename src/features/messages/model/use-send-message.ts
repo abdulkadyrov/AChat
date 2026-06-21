@@ -1,15 +1,15 @@
 import { useMutation } from "@tanstack/react-query";
 import { queueOutgoingMessage } from "@/shared/lib/offline/db";
 import { computeExpiresAt } from "@/shared/lib/ttl/messages";
-import { useAuthStore } from "@/shared/model/auth-store";
-import { useChatStore } from "@/shared/model/chat-store";
-import { useMessageStore } from "@/shared/model/message-store";
+import { useAuthStore, type AuthState } from "@/shared/model/auth-store";
+import { useChatStore, type ChatState } from "@/shared/model/chat-store";
+import { useMessageStore, type MessageState } from "@/shared/model/message-store";
 import {
   sendRemoteMediaMessage,
   sendRemoteTextMessage
 } from "@/shared/lib/supabase/messaging";
-import { useUiStore } from "@/shared/model/ui-store";
-import type { Message, MessageTTL, MessageType } from "@/shared/types/domain";
+import { useUiStore, type UiState } from "@/shared/model/ui-store";
+import type { Chat, Message, MessageTTL, MessageType } from "@/shared/types/domain";
 
 interface SendMessageInput {
   chatId: string;
@@ -46,14 +46,14 @@ function buildLocalMessage(input: {
 }
 
 export function useSendMessage() {
-  const user = useAuthStore((state) => state.user);
-  const chats = useChatStore((state) => state.chats);
-  const chatSecretsByChatId = useChatStore((state) => state.chatSecretsByChatId);
-  const enqueueMessage = useMessageStore((state) => state.enqueueMessage);
-  const setSendingState = useMessageStore((state) => state.setSendingState);
-  const messageTtl = useUiStore((state) => state.messageTtl);
-  const replyTo = useUiStore((state) => state.replyTo);
-  const setReplyTo = useUiStore((state) => state.setReplyTo);
+  const user = useAuthStore((state: AuthState) => state.user);
+  const chats = useChatStore((state: ChatState) => state.chats);
+  const chatSecretsByChatId = useChatStore((state: ChatState) => state.chatSecretsByChatId);
+  const enqueueMessage = useMessageStore((state: MessageState) => state.enqueueMessage);
+  const setSendingState = useMessageStore((state: MessageState) => state.setSendingState);
+  const messageTtl = useUiStore((state: UiState) => state.messageTtl);
+  const replyTo = useUiStore((state: UiState) => state.replyTo);
+  const setReplyTo = useUiStore((state: UiState) => state.setReplyTo);
 
   return useMutation({
     mutationFn: async ({ chatId, content }: SendMessageInput) => {
@@ -63,7 +63,7 @@ export function useSendMessage() {
 
       setSendingState("sending");
 
-      const chat = chats.find((item) => item.id === chatId);
+      const chat = chats.find((item: Chat) => item.id === chatId);
       const ttl = chat?.messageTtl ?? messageTtl;
       const chatSecret = chatSecretsByChatId[chatId];
       const fallbackMessage = buildLocalMessage({
@@ -106,14 +106,14 @@ export function useSendMessage() {
 }
 
 export function useSendMediaMessage() {
-  const user = useAuthStore((state) => state.user);
-  const chats = useChatStore((state) => state.chats);
-  const chatSecretsByChatId = useChatStore((state) => state.chatSecretsByChatId);
-  const enqueueMessage = useMessageStore((state) => state.enqueueMessage);
-  const setSendingState = useMessageStore((state) => state.setSendingState);
-  const messageTtl = useUiStore((state) => state.messageTtl);
-  const replyTo = useUiStore((state) => state.replyTo);
-  const setReplyTo = useUiStore((state) => state.setReplyTo);
+  const user = useAuthStore((state: AuthState) => state.user);
+  const chats = useChatStore((state: ChatState) => state.chats);
+  const chatSecretsByChatId = useChatStore((state: ChatState) => state.chatSecretsByChatId);
+  const enqueueMessage = useMessageStore((state: MessageState) => state.enqueueMessage);
+  const setSendingState = useMessageStore((state: MessageState) => state.setSendingState);
+  const messageTtl = useUiStore((state: UiState) => state.messageTtl);
+  const replyTo = useUiStore((state: UiState) => state.replyTo);
+  const setReplyTo = useUiStore((state: UiState) => state.setReplyTo);
 
   return useMutation({
     mutationFn: async (input: {
@@ -125,7 +125,7 @@ export function useSendMediaMessage() {
     }) => {
       if (!user) throw new Error("Missing authenticated user");
       setSendingState("sending");
-      const chat = chats.find((item) => item.id === input.chatId);
+      const chat = chats.find((item: Chat) => item.id === input.chatId);
       const ttl = chat?.messageTtl ?? messageTtl;
       const chatSecret = chatSecretsByChatId[input.chatId];
       const fallbackMessage = buildLocalMessage({

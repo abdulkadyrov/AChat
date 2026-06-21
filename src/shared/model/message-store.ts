@@ -2,7 +2,7 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import type { Message } from "@/shared/types/domain";
 
-interface MessageState {
+export interface MessageState {
   messagesByChatId: Record<string, Message[]>;
   sendingState: "idle" | "sending" | "error";
   setMessages: (chatId: string, messages: Message[]) => void;

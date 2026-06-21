@@ -1,4 +1,4 @@
-import { useUiStore } from "@/shared/model/ui-store";
+import { useUiStore, type UiState } from "@/shared/model/ui-store";
 
 const content = {
   notifications: {
@@ -20,8 +20,8 @@ const content = {
 } as const;
 
 export function InfoSheet() {
-  const modalState = useUiStore((state) => state.modalState);
-  const setModalState = useUiStore((state) => state.setModalState);
+  const modalState = useUiStore((state: UiState) => state.modalState);
+  const setModalState = useUiStore((state: UiState) => state.setModalState);
 
   if (
     modalState !== "notifications" &&

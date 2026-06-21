@@ -2,13 +2,12 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import type { MessageTTL, ThemeMode } from "@/shared/types/domain";
 
-interface UiState {
+export interface UiState {
   theme: ThemeMode;
   replyTo: string | null;
   modalState:
     | null
     | "auto-delete"
-    | "qr"
     | "profile"
     | "notifications"
     | "security"

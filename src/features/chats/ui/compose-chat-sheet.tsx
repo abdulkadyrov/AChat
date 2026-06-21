@@ -2,8 +2,8 @@ import { useState } from "react";
 import { KeyRound, MessagesSquare, Users } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { JoinChatCodeSheet } from "@/features/chats/ui/join-chat-code-sheet";
-import { useAuthStore } from "@/shared/model/auth-store";
-import { useChatStore } from "@/shared/model/chat-store";
+import { useAuthStore, type AuthState } from "@/shared/model/auth-store";
+import { useChatStore, type ChatState } from "@/shared/model/chat-store";
 import { AccessCodeCard } from "@/shared/ui/access-code-card";
 import { parsePhoneList } from "@/shared/lib/invite/token";
 import type { ChatInvite, UserProfile } from "@/shared/types/domain";
@@ -17,9 +17,9 @@ type Mode = "menu" | "direct" | "group" | "code";
 
 export function ComposeChatSheet({ open, onClose }: ComposeChatSheetProps) {
   const navigate = useNavigate();
-  const user = useAuthStore((state) => state.user);
-  const createDirectChat = useChatStore((state) => state.createDirectChat);
-  const createGroupChat = useChatStore((state) => state.createGroupChat);
+  const user = useAuthStore((state: AuthState) => state.user);
+  const createDirectChat = useChatStore((state: ChatState) => state.createDirectChat);
+  const createGroupChat = useChatStore((state: ChatState) => state.createGroupChat);
   const [mode, setMode] = useState<Mode>("menu");
   const [joinCodeOpen, setJoinCodeOpen] = useState(false);
   const [title, setTitle] = useState("");

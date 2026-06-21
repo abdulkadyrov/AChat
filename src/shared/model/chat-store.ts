@@ -136,7 +136,7 @@ function validateGroupPhones(phones: string[]) {
 
 export const useChatStore = create<ChatState>()(
   persist(
-    (set) => ({
+    (set, get): ChatState => ({
       chats: [],
       invites: [],
       chatSecretsByChatId: {},
@@ -148,8 +148,8 @@ export const useChatStore = create<ChatState>()(
         try {
           const chats = await fetchRemoteChats(user);
           set((state) => ({
-            chats: chats.map((chat) => {
-              const localInvite = state.invites.find((invite) => invite.chatId === chat.id);
+            chats: chats.map((chat: Chat) => {
+              const localInvite = state.invites.find((invite: ChatInvite) => invite.chatId === chat.id);
               return localInvite ? { ...chat, inviteId: localInvite.id } : chat;
             }),
             loading: false
@@ -179,8 +179,8 @@ export const useChatStore = create<ChatState>()(
         );
 
         set((state) => ({
-          chats: [chat, ...state.chats.filter((item) => item.id !== chat.id)],
-          invites: [invite, ...state.invites.filter((item) => item.id !== invite.id)],
+          chats: [chat, ...state.chats.filter((item: Chat) => item.id !== chat.id)],
+          invites: [invite, ...state.invites.filter((item: ChatInvite) => item.id !== invite.id)],
           chatSecretsByChatId: {
             ...state.chatSecretsByChatId,
             [chat.id]: chatSecret
@@ -211,8 +211,8 @@ export const useChatStore = create<ChatState>()(
         );
 
         set((state) => ({
-          chats: [chat, ...state.chats.filter((item) => item.id !== chat.id)],
-          invites: [invite, ...state.invites.filter((item) => item.id !== invite.id)],
+          chats: [chat, ...state.chats.filter((item: Chat) => item.id !== chat.id)],
+          invites: [invite, ...state.invites.filter((item: ChatInvite) => item.id !== invite.id)],
           chatSecretsByChatId: {
             ...state.chatSecretsByChatId,
             [chat.id]: chatSecret
@@ -222,13 +222,14 @@ export const useChatStore = create<ChatState>()(
 
         return invite;
       },
-      joinByAccessCode: async ({ accessCode, user }) => {
+      joinByAccessCode: async ({
+        accessCode,
+        user
+      }: JoinInviteInput): Promise<{ ok: true; chatId: string } | { ok: false; reason: string }> => {
         const normalizedAccessCode = accessCode.trim().toUpperCase();
         const normalizedUserPhone = normalizePhone(user.phone);
 
-        const localInvite = useChatStore
-          .getState()
-          .invites.find((invite) => invite.accessCode === normalizedAccessCode);
+        const localInvite = get().invites.find((invite: ChatInvite) => invite.accessCode === normalizedAccessCode);
 
         if (localInvite) {
           const invitePhones = localInvite.allowedPhones;
@@ -236,7 +237,7 @@ export const useChatStore = create<ChatState>()(
             return { ok: false as const, reason: "Этот код не разрешён для вашего номера." };
           }
 
-          const targetChat = useChatStore.getState().chats.find((chat) => chat.id === localInvite.chatId);
+          const targetChat = get().chats.find((chat: Chat) => chat.id === localInvite.chatId);
           if (!targetChat) {
             return { ok: false as const, reason: "Чат для этого кода не найден." };
           }
@@ -246,7 +247,7 @@ export const useChatStore = create<ChatState>()(
           }
 
           set((state) => ({
-            chats: state.chats.map((chat) =>
+            chats: state.chats.map((chat: Chat) =>
               chat.id === targetChat.id
                 ? {
                     ...chat,
@@ -272,7 +273,7 @@ export const useChatStore = create<ChatState>()(
           });
 
           set((state) => ({
-            chats: [chat, ...state.chats.filter((item) => item.id !== chat.id)],
+            chats: [chat, ...state.chats.filter((item: Chat) => item.id !== chat.id)],
             chatSecretsByChatId: {
               ...state.chatSecretsByChatId,
               [chat.id]: chatSecret
@@ -291,9 +292,9 @@ export const useChatStore = create<ChatState>()(
           };
         }
       },
-      updateGroupLimit: (chatId, memberLimit) =>
+      updateGroupLimit: (chatId: string, memberLimit: number) =>
         set((state) => ({
-          chats: state.chats.map((chat) =>
+          chats: state.chats.map((chat: Chat) =>
             chat.id === chatId && chat.type === "group"
               ? {
                   ...chat,
@@ -302,7 +303,7 @@ export const useChatStore = create<ChatState>()(
                 }
               : chat
           ),
-          invites: state.invites.map((invite) =>
+          invites: state.invites.map((invite: ChatInvite) =>
             invite.chatId === chatId && invite.kind === "group"
               ? {
                   ...invite,
@@ -311,7 +312,17 @@ export const useChatStore = create<ChatState>()(
               : invite
           )
         })),
-      updateChatSettings: async ({ chatId, title, messageTtl, memberLimit }) => {
+      updateChatSettings: async ({
+        chatId,
+        title,
+        messageTtl,
+        memberLimit
+      }: {
+        chatId: string;
+        title: string;
+        messageTtl: MessageTTL;
+        memberLimit?: number;
+      }) => {
         await updateRemoteChatSettings({
           chatId,
           title,
@@ -320,7 +331,7 @@ export const useChatStore = create<ChatState>()(
         }).catch(() => undefined);
 
         set((state) => ({
-          chats: state.chats.map((chat) =>
+          chats: state.chats.map((chat: Chat) =>
             chat.id === chatId
               ? {
                   ...chat,
@@ -335,7 +346,7 @@ export const useChatStore = create<ChatState>()(
           )
         }));
       },
-      deleteChat: async (chatId) => {
+      deleteChat: async (chatId: string) => {
         await deleteRemoteChat(chatId).catch(() => undefined);
         useMessageStore.getState().clearChatMessages(chatId);
         set((state) => {
@@ -343,8 +354,8 @@ export const useChatStore = create<ChatState>()(
           delete nextSecrets[chatId];
 
           return {
-            chats: state.chats.filter((chat) => chat.id !== chatId),
-            invites: state.invites.filter((invite) => invite.chatId !== chatId),
+            chats: state.chats.filter((chat: Chat) => chat.id !== chatId),
+            invites: state.invites.filter((invite: ChatInvite) => invite.chatId !== chatId),
             chatSecretsByChatId: nextSecrets,
             currentChatId: state.currentChatId === chatId ? "" : state.currentChatId
           };

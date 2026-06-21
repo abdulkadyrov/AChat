@@ -8,11 +8,11 @@ import {
   UserRound,
   UsersRound
 } from "lucide-react";
-import { useUiStore } from "@/shared/model/ui-store";
+import { useUiStore, type UiState } from "@/shared/model/ui-store";
 
 export function useSettingsSections() {
-  const theme = useUiStore((state) => state.theme);
-  const messageTtl = useUiStore((state) => state.messageTtl);
+  const theme = useUiStore((state: UiState) => state.theme);
+  const messageTtl = useUiStore((state: UiState) => state.messageTtl);
 
   return [
     { label: "Профиль", icon: UserRound, value: "" },

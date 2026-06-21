@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import type { Chat, MessageTTL } from "@/shared/types/domain";
-import { useChatStore } from "@/shared/model/chat-store";
-import { useUiStore } from "@/shared/model/ui-store";
+import type { Chat, ChatInvite, MessageTTL } from "@/shared/types/domain";
+import { useChatStore, type ChatState } from "@/shared/model/chat-store";
+import { useUiStore, type UiState } from "@/shared/model/ui-store";
 import { AccessCodeCard } from "@/shared/ui/access-code-card";
 
 const ttlOptions: Array<{ value: MessageTTL; label: string }> = [
@@ -18,11 +18,11 @@ interface ChatSettingsSheetProps {
 
 export function ChatSettingsSheet({ chat }: ChatSettingsSheetProps) {
   const navigate = useNavigate();
-  const modalState = useUiStore((state) => state.modalState);
-  const setModalState = useUiStore((state) => state.setModalState);
-  const invites = useChatStore((state) => state.invites);
-  const updateChatSettings = useChatStore((state) => state.updateChatSettings);
-  const deleteChat = useChatStore((state) => state.deleteChat);
+  const modalState = useUiStore((state: UiState) => state.modalState);
+  const setModalState = useUiStore((state: UiState) => state.setModalState);
+  const invites = useChatStore((state: ChatState) => state.invites);
+  const updateChatSettings = useChatStore((state: ChatState) => state.updateChatSettings);
+  const deleteChat = useChatStore((state: ChatState) => state.deleteChat);
   const [title, setTitle] = useState(chat.title);
   const [memberLimit, setMemberLimit] = useState(String(chat.memberLimit ?? 3));
   const [messageTtl, setMessageTtl] = useState<MessageTTL>(chat.messageTtl);
@@ -37,7 +37,7 @@ export function ChatSettingsSheet({ chat }: ChatSettingsSheetProps) {
   }, [chat, modalState]);
 
   const invite = useMemo(
-    () => invites.find((item) => item.chatId === chat.id),
+    () => invites.find((item: ChatInvite) => item.chatId === chat.id),
     [chat.id, invites]
   );
 

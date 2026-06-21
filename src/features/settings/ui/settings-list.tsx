@@ -3,23 +3,23 @@ import { useNavigate } from "react-router-dom";
 import { useSettingsSections } from "@/features/settings/model/use-settings-sections";
 import { deleteOfflineDb } from "@/shared/lib/offline/db";
 import { signOutSupabase } from "@/shared/lib/supabase/messaging";
-import { useAuthStore } from "@/shared/model/auth-store";
-import { useChatStore } from "@/shared/model/chat-store";
-import { useMessageStore } from "@/shared/model/message-store";
-import { useUiStore } from "@/shared/model/ui-store";
+import { useAuthStore, type AuthState } from "@/shared/model/auth-store";
+import { useChatStore, type ChatState } from "@/shared/model/chat-store";
+import { useMessageStore, type MessageState } from "@/shared/model/message-store";
+import { useUiStore, type UiState } from "@/shared/model/ui-store";
 import { SectionCard } from "@/shared/ui/section-card";
 
 export function SettingsList() {
   const items = useSettingsSections();
   const navigate = useNavigate();
-  const signOut = useAuthStore((state) => state.signOut);
-  const clearAuth = useAuthStore((state) => state.clearAuth);
-  const clearAllChats = useChatStore((state) => state.clearAllChats);
-  const clearAllMessages = useMessageStore((state) => state.clearAllMessages);
-  const setModalState = useUiStore((state) => state.setModalState);
-  const setTheme = useUiStore((state) => state.setTheme);
-  const resetUi = useUiStore((state) => state.resetUi);
-  const theme = useUiStore((state) => state.theme);
+  const signOut = useAuthStore((state: AuthState) => state.signOut);
+  const clearAuth = useAuthStore((state: AuthState) => state.clearAuth);
+  const clearAllChats = useChatStore((state: ChatState) => state.clearAllChats);
+  const clearAllMessages = useMessageStore((state: MessageState) => state.clearAllMessages);
+  const setModalState = useUiStore((state: UiState) => state.setModalState);
+  const setTheme = useUiStore((state: UiState) => state.setTheme);
+  const resetUi = useUiStore((state: UiState) => state.resetUi);
+  const theme = useUiStore((state: UiState) => state.theme);
 
   function handleItemClick(label: string) {
     if (label === "Профиль") setModalState("profile");

@@ -1,8 +1,8 @@
-import { useUiStore } from "@/shared/model/ui-store";
+import { useUiStore, type UiState } from "@/shared/model/ui-store";
 
 export function useTheme() {
-  const theme = useUiStore((state) => state.theme);
-  const setTheme = useUiStore((state) => state.setTheme);
+  const theme = useUiStore((state: UiState) => state.theme);
+  const setTheme = useUiStore((state: UiState) => state.setTheme);
 
   return {
     theme,

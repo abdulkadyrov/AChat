@@ -1,18 +1,18 @@
 import { useEffect } from "react";
 import { Outlet } from "react-router-dom";
 import { AuthPage } from "@/pages/auth/ui/auth-page";
-import { useAuthStore } from "@/shared/model/auth-store";
+import { useAuthStore, type AuthState } from "@/shared/model/auth-store";
 import { applyTheme } from "@/shared/lib/theme/apply-theme";
 import { ensureSupabaseIdentity } from "@/shared/lib/supabase/messaging";
-import { useChatStore } from "@/shared/model/chat-store";
-import { useUiStore } from "@/shared/model/ui-store";
+import { useChatStore, type ChatState } from "@/shared/model/chat-store";
+import { useUiStore, type UiState } from "@/shared/model/ui-store";
 import { AppShell } from "@/widgets/app-shell/ui/app-shell";
 
 export function RootLayout() {
-  const theme = useUiStore((state) => state.theme);
-  const user = useAuthStore((state) => state.user);
-  const setRemoteUserId = useAuthStore((state) => state.setRemoteUserId);
-  const hydrateChats = useChatStore((state) => state.hydrateChats);
+  const theme = useUiStore((state: UiState) => state.theme);
+  const user = useAuthStore((state: AuthState) => state.user);
+  const setRemoteUserId = useAuthStore((state: AuthState) => state.setRemoteUserId);
+  const hydrateChats = useChatStore((state: ChatState) => state.hydrateChats);
 
   useEffect(() => {
     applyTheme(theme);

@@ -8,6 +8,7 @@ import { ChatList } from "@/entities/chat/ui/chat-list";
 import { IconButton } from "@/shared/ui/icon-button";
 import { SearchInput } from "@/shared/ui/search-input";
 import { SectionCard } from "@/shared/ui/section-card";
+import type { Chat } from "@/shared/types/domain";
 
 export function ChatsPage() {
   const chats = useChats();
@@ -17,7 +18,7 @@ export function ChatsPage() {
 
   const normalized = search.trim().toLowerCase();
   const filteredChats = normalized
-    ? chats.filter((chat) => chat.title.toLowerCase().includes(normalized))
+    ? chats.filter((chat: Chat) => chat.title.toLowerCase().includes(normalized))
     : chats;
 
   return (

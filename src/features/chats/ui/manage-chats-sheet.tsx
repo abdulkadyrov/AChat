@@ -1,7 +1,7 @@
 import { Trash2 } from "lucide-react";
 import { useState } from "react";
-import type { ChatType } from "@/shared/types/domain";
-import { useChatStore } from "@/shared/model/chat-store";
+import type { Chat, ChatType } from "@/shared/types/domain";
+import { useChatStore, type ChatState } from "@/shared/model/chat-store";
 
 interface ManageChatsSheetProps {
   open: boolean;
@@ -16,13 +16,13 @@ export function ManageChatsSheet({
   title = "Управление чатами",
   filter
 }: ManageChatsSheetProps) {
-  const chats = useChatStore((state) => state.chats);
-  const deleteChat = useChatStore((state) => state.deleteChat);
+  const chats = useChatStore((state: ChatState) => state.chats);
+  const deleteChat = useChatStore((state: ChatState) => state.deleteChat);
   const [deletingChatId, setDeletingChatId] = useState<string | null>(null);
 
   if (!open) return null;
 
-  const visibleChats = filter ? chats.filter((chat) => chat.type === filter) : chats;
+  const visibleChats = filter ? chats.filter((chat: Chat) => chat.type === filter) : chats;
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/40 p-4 backdrop-blur-sm">

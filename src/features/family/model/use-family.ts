@@ -1,7 +1,7 @@
-import { useAuthStore } from "@/shared/model/auth-store";
+import { useAuthStore, type AuthState } from "@/shared/model/auth-store";
 
 export function useFamily() {
-  const currentUser = useAuthStore((state) => state.user);
+  const currentUser = useAuthStore((state: AuthState) => state.user);
 
   return {
     family: currentUser

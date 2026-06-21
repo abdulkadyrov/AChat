@@ -1,6 +1,6 @@
 import { CheckCheck, Download, Play, Reply } from "lucide-react";
 import { getUserById } from "@/entities/user/model/selectors";
-import { useAuthStore } from "@/shared/model/auth-store";
+import { useAuthStore, type AuthState } from "@/shared/model/auth-store";
 import { formatTime } from "@/shared/lib/utils/date";
 import { cn } from "@/shared/lib/utils/cn";
 import type { Message } from "@/shared/types/domain";
@@ -12,7 +12,7 @@ interface MessageBubbleProps {
 }
 
 export function MessageBubble({ message, replyPreview, onOpenActions }: MessageBubbleProps) {
-  const currentUser = useAuthStore((state) => state.user);
+  const currentUser = useAuthStore((state: AuthState) => state.user);
   const currentUserId = currentUser?.id;
   const sender = getUserById(message.senderId, currentUser);
   const isMine = message.senderId === currentUserId;

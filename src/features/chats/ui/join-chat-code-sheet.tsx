@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useAuthStore } from "@/shared/model/auth-store";
-import { useChatStore } from "@/shared/model/chat-store";
+import { useAuthStore, type AuthState } from "@/shared/model/auth-store";
+import { useChatStore, type ChatState } from "@/shared/model/chat-store";
 
 interface JoinChatCodeSheetProps {
   open: boolean;
@@ -10,8 +10,8 @@ interface JoinChatCodeSheetProps {
 
 export function JoinChatCodeSheet({ open, onClose }: JoinChatCodeSheetProps) {
   const navigate = useNavigate();
-  const user = useAuthStore((state) => state.user);
-  const joinByAccessCode = useChatStore((state) => state.joinByAccessCode);
+  const user = useAuthStore((state: AuthState) => state.user);
+  const joinByAccessCode = useChatStore((state: ChatState) => state.joinByAccessCode);
   const [code, setCode] = useState("");
   const [error, setError] = useState("");
   const [isJoining, setJoining] = useState(false);

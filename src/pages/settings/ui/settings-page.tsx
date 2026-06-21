@@ -2,11 +2,11 @@ import { AutoDeleteSheet } from "@/features/settings/ui/auto-delete-sheet";
 import { InfoSheet } from "@/features/settings/ui/info-sheet";
 import { ProfileSheet } from "@/features/settings/ui/profile-sheet";
 import { SettingsList } from "@/features/settings/ui/settings-list";
-import { useAuthStore } from "@/shared/model/auth-store";
+import { useAuthStore, type AuthState } from "@/shared/model/auth-store";
 import { SectionCard } from "@/shared/ui/section-card";
 
 export function SettingsPage() {
-  const user = useAuthStore((state) => state.user);
+  const user = useAuthStore((state: AuthState) => state.user);
 
   return (
     <>

@@ -1,7 +1,7 @@
 import { Copy, Reply, Trash2 } from "lucide-react";
 import { deleteRemoteMessage } from "@/shared/lib/supabase/messaging";
-import { useMessageStore } from "@/shared/model/message-store";
-import { useUiStore } from "@/shared/model/ui-store";
+import { useMessageStore, type MessageState } from "@/shared/model/message-store";
+import { useUiStore, type UiState } from "@/shared/model/ui-store";
 import type { Message } from "@/shared/types/domain";
 
 interface MessageActionSheetProps {
@@ -11,8 +11,8 @@ interface MessageActionSheetProps {
 }
 
 export function MessageActionSheet({ message, open, onClose }: MessageActionSheetProps) {
-  const setReplyTo = useUiStore((state) => state.setReplyTo);
-  const removeMessage = useMessageStore((state) => state.removeMessage);
+  const setReplyTo = useUiStore((state: UiState) => state.setReplyTo);
+  const removeMessage = useMessageStore((state: MessageState) => state.removeMessage);
 
   if (!open || !message) return null;
 

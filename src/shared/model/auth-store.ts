@@ -2,7 +2,7 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import type { AuthSession, UserProfile } from "@/shared/types/domain";
 
-interface AuthState {
+export interface AuthState {
   user: UserProfile | null;
   session: AuthSession | null;
   setSession: (user: UserProfile, session: AuthSession) => void;

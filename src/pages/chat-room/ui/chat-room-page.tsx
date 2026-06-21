@@ -10,21 +10,22 @@ import {
   fetchRemoteMessages,
   subscribeToRemoteMessages
 } from "@/shared/lib/supabase/messaging";
-import { useChatStore } from "@/shared/model/chat-store";
-import { useMessageStore } from "@/shared/model/message-store";
-import { useUiStore } from "@/shared/model/ui-store";
+import { useChatStore, type ChatState } from "@/shared/model/chat-store";
+import { useMessageStore, type MessageState } from "@/shared/model/message-store";
+import { useUiStore, type UiState } from "@/shared/model/ui-store";
 import { isMessageExpired } from "@/shared/lib/ttl/messages";
 import { SectionCard } from "@/shared/ui/section-card";
+import type { Chat, Message } from "@/shared/types/domain";
 
 export function ChatRoomPage() {
   const { id } = useParams();
-  const chats = useChatStore((state) => state.chats);
-  const chatSecretsByChatId = useChatStore((state) => state.chatSecretsByChatId);
-  const messagesByChatId = useMessageStore((state) => state.messagesByChatId);
-  const setMessages = useMessageStore((state) => state.setMessages);
-  const enqueueMessage = useMessageStore((state) => state.enqueueMessage);
-  const replyTo = useUiStore((state) => state.replyTo);
-  const chat = chats.find((item) => item.id === id);
+  const chats = useChatStore((state: ChatState) => state.chats);
+  const chatSecretsByChatId = useChatStore((state: ChatState) => state.chatSecretsByChatId);
+  const messagesByChatId = useMessageStore((state: MessageState) => state.messagesByChatId);
+  const setMessages = useMessageStore((state: MessageState) => state.setMessages);
+  const enqueueMessage = useMessageStore((state: MessageState) => state.enqueueMessage);
+  const replyTo = useUiStore((state: UiState) => state.replyTo);
+  const chat = chats.find((item: Chat) => item.id === id);
   const [actionMessageId, setActionMessageId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -58,8 +59,8 @@ export function ChatRoomPage() {
         : [],
     [chat, messagesByChatId]
   );
-  const actionMessage = messages.find((message) => message.id === actionMessageId) ?? null;
-  const replyPreview = replyTo ? messages.find((message) => message.id === replyTo)?.preview ?? null : null;
+  const actionMessage = messages.find((message: Message) => message.id === actionMessageId) ?? null;
+  const replyPreview = replyTo ? messages.find((message: Message) => message.id === replyTo)?.preview ?? null : null;
 
   if (!chat) {
     return (

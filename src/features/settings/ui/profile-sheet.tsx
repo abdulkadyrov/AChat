@@ -1,12 +1,12 @@
 import { useEffect, useState } from "react";
-import { useAuthStore } from "@/shared/model/auth-store";
-import { useUiStore } from "@/shared/model/ui-store";
+import { useAuthStore, type AuthState } from "@/shared/model/auth-store";
+import { useUiStore, type UiState } from "@/shared/model/ui-store";
 
 export function ProfileSheet() {
-  const modalState = useUiStore((state) => state.modalState);
-  const setModalState = useUiStore((state) => state.setModalState);
-  const user = useAuthStore((state) => state.user);
-  const updateProfile = useAuthStore((state) => state.updateProfile);
+  const modalState = useUiStore((state: UiState) => state.modalState);
+  const setModalState = useUiStore((state: UiState) => state.setModalState);
+  const user = useAuthStore((state: AuthState) => state.user);
+  const updateProfile = useAuthStore((state: AuthState) => state.updateProfile);
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [about, setAbout] = useState("");

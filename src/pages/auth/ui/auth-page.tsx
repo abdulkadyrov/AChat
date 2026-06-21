@@ -1,10 +1,10 @@
 import { useState } from "react";
 import { ShieldCheck } from "lucide-react";
-import { useAuthStore } from "@/shared/model/auth-store";
+import { useAuthStore, type AuthState } from "@/shared/model/auth-store";
 import { SectionCard } from "@/shared/ui/section-card";
 
 export function AuthPage() {
-  const signInLocal = useAuthStore((state) => state.signInLocal);
+  const signInLocal = useAuthStore((state: AuthState) => state.signInLocal);
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [about, setAbout] = useState("");

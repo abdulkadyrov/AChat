@@ -1,7 +1,7 @@
 import { ArrowLeft, Lock, MoreVertical, Phone } from "lucide-react";
 import { Link } from "react-router-dom";
 import type { Chat } from "@/shared/types/domain";
-import { useUiStore } from "@/shared/model/ui-store";
+import { useUiStore, type UiState } from "@/shared/model/ui-store";
 import { AvatarStack } from "@/shared/ui/avatar-stack";
 import { IconButton } from "@/shared/ui/icon-button";
 
@@ -10,7 +10,7 @@ interface ChatHeaderProps {
 }
 
 export function ChatHeader({ chat }: ChatHeaderProps) {
-  const setModalState = useUiStore((state) => state.setModalState);
+  const setModalState = useUiStore((state: UiState) => state.setModalState);
 
   return (
     <div className="mb-4 flex items-center gap-3">
