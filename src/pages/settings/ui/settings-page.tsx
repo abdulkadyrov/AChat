@@ -6,6 +6,7 @@ import { SettingsList } from "@/features/settings/ui/settings-list";
 import { useAuthStore, type AuthState } from "@/shared/model/auth-store";
 import { useUiStore, type UiState } from "@/shared/model/ui-store";
 import { Avatar } from "@/shared/ui/avatar";
+import { DailyParticipantCode } from "@/shared/ui/daily-participant-code";
 
 export function SettingsPage() {
   const user = useAuthStore((state: AuthState) => state.user);
@@ -30,6 +31,7 @@ export function SettingsPage() {
             <span className="mt-1 block text-[12px] text-[var(--color-text-secondary)]">
               {user.phone}
             </span>
+            <DailyParticipantCode user={user} compact />
             <span className="mt-1 block truncate text-[12px] text-[var(--color-text-secondary)]">
               {user.about || "Добавьте информацию о себе"}
             </span>

@@ -12,6 +12,8 @@ A responsive family-messenger PWA built with React, TypeScript, Zustand, React Q
 - Image preview/fullscreen view, attachment picker and voice-recording preview
 - Family member roles/statuses, member management and key-rotation warning
 - Functional invite tokens, access codes, QR generation, sharing and code rotation
+- QR-first chat creation and joining without pre-entering participant phone numbers
+- Automatic eight-digit participant code that rotates daily and is shown in the profile
 - Per-chat auto-delete periods: 24 hours, 7, 30 or 90 days
 - Profile, account sessions, privacy, notification, chat, language and theme settings
 - System/light/dark themes applied before the first React render

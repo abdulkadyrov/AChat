@@ -292,7 +292,8 @@ begin
     and is_active = true and expires_at > timezone('utc', now())
   for update;
   if not found then raise exception 'Code not found, inactive, or expired'; end if;
-  if not (v_profile_phone = any(v_invite.allowed_phones)) then
+  if cardinality(v_invite.allowed_phones) > 0
+    and not (v_profile_phone = any(v_invite.allowed_phones)) then
     raise exception 'This code is not allowed for this phone number';
   end if;
 

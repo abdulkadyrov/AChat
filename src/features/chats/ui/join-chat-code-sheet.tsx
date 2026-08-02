@@ -8,9 +8,10 @@ import type { UserProfile } from "@/shared/types/domain";
 interface JoinChatCodeSheetProps {
   open: boolean;
   onClose: () => void;
+  onJoined?: () => void;
 }
 
-export function JoinChatCodeSheet({ open, onClose }: JoinChatCodeSheetProps) {
+export function JoinChatCodeSheet({ open, onClose, onJoined }: JoinChatCodeSheetProps) {
   const navigate = useNavigate();
   const user = useAuthStore((state: AuthState) => state.user);
   const joinByAccessCode = useChatStore((state: ChatState) => state.joinByAccessCode);
@@ -34,6 +35,7 @@ export function JoinChatCodeSheet({ open, onClose }: JoinChatCodeSheetProps) {
 
       setCode("");
       onClose();
+      onJoined?.();
       navigate(`/chat/${joined.chatId}`);
     } finally {
       setJoining(false);
@@ -44,8 +46,8 @@ export function JoinChatCodeSheet({ open, onClose }: JoinChatCodeSheetProps) {
     <Sheet
       open={open}
       onClose={onClose}
-      title="Войти по коду"
-      description="Введите 6-значный код. Вход сработает только если ваш номер разрешён в этом чате."
+      title="Ввести код вручную"
+      description="Запасной вариант, если QR не сканируется. Введите короткий 6-значный код приглашения."
     >
       <input
         value={code}
