@@ -3,6 +3,7 @@ import { Camera } from "lucide-react";
 import { useAuthStore, type AuthState } from "@/shared/model/auth-store";
 import { useUiStore, type UiState } from "@/shared/model/ui-store";
 import { Avatar } from "@/shared/ui/avatar";
+import { DailyParticipantCode } from "@/shared/ui/daily-participant-code";
 import { Sheet } from "@/shared/ui/sheet";
 
 function fileToDataUrl(file: File) {
@@ -72,6 +73,9 @@ export function ProfileSheet() {
             if (file) setAvatarUrl(await fileToDataUrl(file));
           }}
         />
+      </div>
+      <div className="mt-5">
+        <DailyParticipantCode user={user} />
       </div>
       <div className="mt-5 space-y-4">
         <label className="block">

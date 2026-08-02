@@ -102,6 +102,7 @@ export async function createRemoteChat(input: {
   type: Chat["type"];
   user: UserProfile;
   allowedPhones: string[];
+  memberLimit: number;
 }) {
   const ownerId = await ensureSupabaseIdentity(input.user);
   const chatSecret = await generateSharedSecret();
@@ -119,7 +120,7 @@ export async function createRemoteChat(input: {
       owner_id: ownerId,
       target_phone: allowedPhones[0] ?? null,
       allowed_phones: allowedPhones,
-      member_limit: allowedPhones.length,
+      member_limit: input.memberLimit,
       message_ttl: "7d"
     })
     .select()
@@ -143,7 +144,7 @@ export async function createRemoteChat(input: {
     accessCode,
     allowedPhones,
     allowedPhone: allowedPhones[0] ?? null,
-    maxParticipants: allowedPhones.length,
+    maxParticipants: input.memberLimit,
     createdAt,
     chatSecret
   };

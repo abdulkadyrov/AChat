@@ -71,6 +71,14 @@ export function buildInviteToken(invite: Omit<ChatInvite, "token">) {
 }
 
 export function parseInviteToken(token: string) {
-  const payload = JSON.parse(fromBase64(token)) as InvitePayload;
+  const payload = JSON.parse(fromBase64(token.trim())) as InvitePayload;
+  if (
+    payload.version !== 2 ||
+    typeof payload.chatId !== "string" ||
+    typeof payload.accessCode !== "string" ||
+    !/^[A-Z2-9]{6}$/.test(payload.accessCode)
+  ) {
+    throw new Error("Invalid AChat invite");
+  }
   return payload;
 }

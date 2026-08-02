@@ -5,8 +5,8 @@ import {
   buildInviteToken,
   dedupePhones,
   generateAccessCode,
-  isValidMemberPhone,
-  normalizePhone
+  normalizePhone,
+  parseInviteToken
 } from "@/shared/lib/invite/token";
 import {
   createRemoteChat,
@@ -22,18 +22,22 @@ import type { Chat, ChatInvite, MessageTTL, UserProfile } from "@/shared/types/d
 
 interface CreateDirectInput {
   title: string;
-  recipientPhone: string;
   user: UserProfile;
 }
 
 interface CreateGroupInput {
   title: string;
-  memberPhones: string[];
+  memberLimit: number;
   user: UserProfile;
 }
 
 interface JoinInviteInput {
   accessCode: string;
+  user: UserProfile;
+}
+
+interface JoinTokenInput {
+  token: string;
   user: UserProfile;
 }
 
@@ -50,6 +54,9 @@ export interface ChatState {
   createGroupChat: (input: CreateGroupInput) => Promise<ChatInvite>;
   joinByAccessCode: (
     input: JoinInviteInput
+  ) => Promise<{ ok: true; chatId: string } | { ok: false; reason: string }>;
+  joinByInviteToken: (
+    input: JoinTokenInput
   ) => Promise<{ ok: true; chatId: string } | { ok: false; reason: string }>;
   updateGroupLimit: (chatId: string, memberLimit: number) => void;
   rotateInvite: (chatId: string) => ChatInvite | null;
@@ -72,6 +79,7 @@ async function buildLocalChatInvite(input: {
   type: Chat["type"];
   user: UserProfile;
   allowedPhones: string[];
+  memberLimit: number;
 }) {
   const chatId = crypto.randomUUID();
   const inviteId = crypto.randomUUID();
@@ -90,7 +98,7 @@ async function buildLocalChatInvite(input: {
     accessCode,
     allowedPhones: normalizedPhones,
     allowedPhone: normalizedPhones[0] ?? null,
-    maxParticipants: normalizedPhones.length,
+    maxParticipants: input.memberLimit,
     createdAt,
     chatSecret,
     token: ""
@@ -105,41 +113,21 @@ async function buildLocalChatInvite(input: {
     title: input.title.trim(),
     subtitle:
       input.type === "group"
-        ? `Код для ${normalizedPhones.length} участников`
-        : `Вход по коду для номера ${normalizedPhones[0] ?? "не задан"}`,
+        ? `QR-приглашение · до ${input.memberLimit} участников`
+        : "Вход по QR-приглашению",
     avatarGroup: [input.user.avatarUrl],
     unreadCount: 0,
     lastMessageAt: createdAt,
     ownerId: input.user.id,
     participantIds: [input.user.id],
     participantPhones: [normalizePhone(input.user.phone)],
-    memberLimit: normalizedPhones.length,
+    memberLimit: input.memberLimit,
     inviteId,
     targetPhone: normalizedPhones[0] ?? null,
     messageTtl: "7d"
   };
 
   return { chat, invite, chatSecret };
-}
-
-function validateGroupPhones(phones: string[]) {
-  const normalizedPhones = sanitizeAllowedPhones(phones);
-
-  if (normalizedPhones.length === 0) {
-    return { ok: false as const, reason: "Добавьте хотя бы один 8-значный номер." };
-  }
-
-  if (normalizedPhones.some((phone) => !isValidMemberPhone(phone))) {
-    return { ok: false as const, reason: "Для группы разрешены только 8-значные номера." };
-  }
-
-  if (
-    normalizedPhones.length !== phones.map((phone) => normalizePhone(phone)).filter(Boolean).length
-  ) {
-    return { ok: false as const, reason: "Одинаковые номера в группе запрещены." };
-  }
-
-  return { ok: true as const, phones: normalizedPhones };
 }
 
 export const useChatStore = create<ChatState>()(
@@ -190,22 +178,21 @@ export const useChatStore = create<ChatState>()(
           });
         }
       },
-      createDirectChat: async ({ title, recipientPhone, user }) => {
-        const normalizedPhone = normalizePhone(recipientPhone);
-        if (!isValidMemberPhone(normalizedPhone)) {
-          throw new Error("Для личного чата нужен один 8-значный номер.");
-        }
+      createDirectChat: async ({ title, user }) => {
+        if (!title.trim()) throw new Error("Введите название чата.");
 
         const { chat, invite, chatSecret } = await createRemoteChat({
           title,
           type: "direct",
-          allowedPhones: [normalizedPhone],
+          allowedPhones: [],
+          memberLimit: 1,
           user
         }).catch(() =>
           buildLocalChatInvite({
             title,
             type: "direct",
-            allowedPhones: [normalizedPhone],
+            allowedPhones: [],
+            memberLimit: 1,
             user
           })
         );
@@ -222,22 +209,24 @@ export const useChatStore = create<ChatState>()(
 
         return invite;
       },
-      createGroupChat: async ({ title, memberPhones, user }) => {
-        const validation = validateGroupPhones(memberPhones);
-        if (!validation.ok) {
-          throw new Error(validation.reason);
+      createGroupChat: async ({ title, memberLimit, user }) => {
+        if (!title.trim()) throw new Error("Введите название группы.");
+        if (!Number.isInteger(memberLimit) || memberLimit < 1 || memberLimit > 50) {
+          throw new Error("Укажите количество участников от 1 до 50.");
         }
 
         const { chat, invite, chatSecret } = await createRemoteChat({
           title,
           type: "group",
-          allowedPhones: validation.phones,
+          allowedPhones: [],
+          memberLimit,
           user
         }).catch(() =>
           buildLocalChatInvite({
             title,
             type: "group",
-            allowedPhones: validation.phones,
+            allowedPhones: [],
+            memberLimit,
             user
           })
         );
@@ -269,7 +258,7 @@ export const useChatStore = create<ChatState>()(
 
         if (localInvite) {
           const invitePhones = localInvite.allowedPhones;
-          if (!invitePhones.includes(normalizedUserPhone)) {
+          if (invitePhones.length > 0 && !invitePhones.includes(normalizedUserPhone)) {
             return { ok: false as const, reason: "Этот код не разрешён для вашего номера." };
           }
 
@@ -323,6 +312,85 @@ export const useChatStore = create<ChatState>()(
             ok: false as const,
             reason: error instanceof Error ? error.message : "Не удалось подключиться по коду."
           };
+        }
+      },
+      joinByInviteToken: async ({ token, user }) => {
+        try {
+          const payload = parseInviteToken(token);
+          const existingInvite = get().invites.find(
+            (invite) => invite.id === payload.inviteId || invite.accessCode === payload.accessCode
+          );
+
+          if (existingInvite || isSupabaseConfigured) {
+            return get().joinByAccessCode({ accessCode: payload.accessCode, user });
+          }
+
+          if (Date.now() - new Date(payload.createdAt).getTime() > 24 * 60 * 60 * 1000) {
+            return { ok: false as const, reason: "Срок действия QR-приглашения истёк." };
+          }
+
+          const normalizedUserPhone = normalizePhone(user.phone);
+          if (
+            payload.allowedPhones.length > 0 &&
+            !payload.allowedPhones.includes(normalizedUserPhone)
+          ) {
+            return {
+              ok: false as const,
+              reason: "Приглашение не предназначено для этого профиля."
+            };
+          }
+
+          const participantIds = Array.from(new Set([payload.createdBy, user.id]));
+          const participantPhones = Array.from(
+            new Set([payload.createdByPhone, normalizedUserPhone].filter(Boolean))
+          );
+          const invite: ChatInvite = {
+            id: payload.inviteId,
+            chatId: payload.chatId,
+            kind: payload.kind,
+            title: payload.title,
+            createdBy: payload.createdBy,
+            createdByPhone: payload.createdByPhone,
+            accessCode: payload.accessCode,
+            allowedPhones: payload.allowedPhones,
+            allowedPhone: payload.allowedPhones[0] ?? null,
+            maxParticipants: payload.maxParticipants,
+            createdAt: payload.createdAt,
+            chatSecret: payload.chatSecret,
+            token
+          };
+          const chat: Chat = {
+            id: payload.chatId,
+            familyId: payload.chatId,
+            type: payload.kind,
+            title: payload.title,
+            subtitle:
+              payload.kind === "group" ? `Участников: ${participantIds.length}` : "Защищённый чат",
+            avatarGroup: [user.avatarUrl],
+            unreadCount: 0,
+            lastMessageAt: new Date().toISOString(),
+            ownerId: payload.createdBy,
+            participantIds,
+            participantPhones,
+            memberLimit: payload.maxParticipants,
+            inviteId: payload.inviteId,
+            targetPhone: payload.allowedPhones[0] ?? null,
+            messageTtl: "7d"
+          };
+
+          set((state) => ({
+            chats: [chat, ...state.chats.filter((item) => item.id !== chat.id)],
+            invites: [invite, ...state.invites.filter((item) => item.id !== invite.id)],
+            chatSecretsByChatId: {
+              ...state.chatSecretsByChatId,
+              [chat.id]: payload.chatSecret
+            },
+            currentChatId: chat.id
+          }));
+
+          return { ok: true as const, chatId: chat.id };
+        } catch {
+          return { ok: false as const, reason: "Это не QR-приглашение AChat." };
         }
       },
       updateGroupLimit: (chatId: string, memberLimit: number) =>
