@@ -21,7 +21,14 @@ export function useSettingsSections() {
     {
       label: "Автоудаление сообщений",
       icon: Trash2,
-      value: messageTtl === "off" ? "Выкл" : messageTtl === "24h" ? "24 часа" : messageTtl === "7d" ? "7 дней" : "30 дней"
+      value:
+        messageTtl === "off"
+          ? "Выкл"
+          : messageTtl === "24h"
+            ? "24 часа"
+            : messageTtl === "7d"
+              ? "7 дней"
+              : "30 дней"
     },
     { label: "Тема", icon: MoonStar, value: theme === "light" ? "Светлая" : "Тёмная" },
     { label: "Безопасность", icon: ShieldAlert, value: "" },

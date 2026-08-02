@@ -4,10 +4,7 @@ import { computeExpiresAt } from "@/shared/lib/ttl/messages";
 import { useAuthStore, type AuthState } from "@/shared/model/auth-store";
 import { useChatStore, type ChatState } from "@/shared/model/chat-store";
 import { useMessageStore, type MessageState } from "@/shared/model/message-store";
-import {
-  sendRemoteMediaMessage,
-  sendRemoteTextMessage
-} from "@/shared/lib/supabase/messaging";
+import { sendRemoteMediaMessage, sendRemoteTextMessage } from "@/shared/lib/supabase/messaging";
 import { useUiStore, type UiState } from "@/shared/model/ui-store";
 import type { Chat, Message, MessageTTL, MessageType } from "@/shared/types/domain";
 
@@ -20,10 +17,12 @@ function buildLocalMessage(input: {
   chatId: string;
   senderId: string;
   ttl: MessageTTL;
-  type: Extract<MessageType, "text" | "image" | "voice">;
+  type: Extract<MessageType, "text" | "image" | "voice" | "file">;
   preview: string;
   dataUrl?: string;
   durationSec?: number;
+  fileName?: string;
+  fileSize?: number;
   replyTo?: string | null;
 }): Message {
   const createdAt = new Date().toISOString();
@@ -41,6 +40,8 @@ function buildLocalMessage(input: {
     preview: input.preview,
     mediaDataUrl: input.dataUrl,
     durationSec: input.durationSec,
+    fileName: input.fileName,
+    fileSize: input.fileSize,
     status: "sent"
   };
 }
@@ -118,10 +119,12 @@ export function useSendMediaMessage() {
   return useMutation({
     mutationFn: async (input: {
       chatId: string;
-      type: "image" | "voice";
+      type: "image" | "voice" | "file";
       dataUrl: string;
       preview: string;
       durationSec?: number;
+      fileName?: string;
+      fileSize?: number;
     }) => {
       if (!user) throw new Error("Missing authenticated user");
       setSendingState("sending");
@@ -136,14 +139,20 @@ export function useSendMediaMessage() {
         preview: input.preview,
         dataUrl: input.dataUrl,
         durationSec: input.durationSec,
+        fileName: input.fileName,
+        fileSize: input.fileSize,
         replyTo
       });
 
       let message = fallbackMessage;
-      if (chatSecret) {
+      if (chatSecret && input.type !== "file") {
         try {
           message = await sendRemoteMediaMessage({
-            ...input,
+            chatId: input.chatId,
+            type: input.type,
+            dataUrl: input.dataUrl,
+            preview: input.preview,
+            durationSec: input.durationSec,
             user,
             chatSecret,
             ttl,

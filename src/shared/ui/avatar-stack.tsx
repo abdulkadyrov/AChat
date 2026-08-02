@@ -1,37 +1,41 @@
+import { Avatar } from "@/shared/ui/avatar";
 import { cn } from "@/shared/lib/utils/cn";
 
 interface AvatarStackProps {
   avatars: string[];
+  names?: string[];
   size?: "sm" | "md";
 }
 
-export function AvatarStack({ avatars, size = "md" }: AvatarStackProps) {
-  const sizeClass = size === "sm" ? "h-9 w-9" : "h-11 w-11";
-
-  if (avatars.length === 1) {
-    return (
-      <img
-        src={avatars[0]}
-        alt=""
-        className={cn(sizeClass, "rounded-full object-cover ring-2 ring-white dark:ring-[#0f1724]")}
-      />
-    );
+export function AvatarStack({ avatars, names = [], size = "md" }: AvatarStackProps) {
+  if (avatars.length <= 1) {
+    return <Avatar src={avatars[0]} name={names[0] ?? "Чат"} size={size} />;
   }
 
+  const small = size === "sm";
   return (
-    <div className="flex items-center">
-      {avatars.slice(0, 3).map((avatar, index) => (
-        <img
-          key={avatar}
-          src={avatar}
-          alt=""
-          className={cn(
-            sizeClass,
-            "rounded-full object-cover ring-2 ring-white dark:ring-[#0f1724]",
-            index > 0 && "-ml-3"
-          )}
-        />
-      ))}
+    <div
+      className={cn("relative shrink-0", small ? "h-10 w-10" : "h-[52px] w-[52px]")}
+      aria-label="Аватары участников"
+    >
+      <Avatar
+        src={avatars[0]}
+        name={names[0] ?? "Участник"}
+        size="sm"
+        className={cn(
+          "absolute left-0 top-0 border-2 border-[var(--color-surface)]",
+          small ? "h-7 w-7" : "h-9 w-9"
+        )}
+      />
+      <Avatar
+        src={avatars[1]}
+        name={names[1] ?? "Участник"}
+        size="sm"
+        className={cn(
+          "absolute bottom-0 right-0 border-2 border-[var(--color-surface)]",
+          small ? "h-7 w-7" : "h-9 w-9"
+        )}
+      />
     </div>
   );
 }

@@ -1,9 +1,6 @@
 import QrScanner from "qr-scanner";
 
-QrScanner.WORKER_PATH = new URL(
-  "qr-scanner/qr-scanner-worker.min.js",
-  import.meta.url
-).toString();
+QrScanner.WORKER_PATH = new URL("qr-scanner/qr-scanner-worker.min.js", import.meta.url).toString();
 
 async function loadImageFromBlob(blob: Blob) {
   const imageUrl = URL.createObjectURL(blob);

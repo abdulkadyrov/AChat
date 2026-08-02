@@ -16,6 +16,8 @@ import {
   updateRemoteChatSettings
 } from "@/shared/lib/supabase/messaging";
 import { useMessageStore } from "@/shared/model/message-store";
+import { isSupabaseConfigured } from "@/shared/config/env";
+import { createDemoChats, createDemoInvites, createDemoMessages } from "@/shared/mocks/demo-data";
 import type { Chat, ChatInvite, MessageTTL, UserProfile } from "@/shared/types/domain";
 
 interface CreateDirectInput {
@@ -41,12 +43,16 @@ export interface ChatState {
   chatSecretsByChatId: Record<string, string>;
   currentChatId: string;
   loading: boolean;
+  error: string | null;
   setCurrentChatId: (chatId: string) => void;
   hydrateChats: (user: UserProfile) => Promise<void>;
   createDirectChat: (input: CreateDirectInput) => Promise<ChatInvite>;
   createGroupChat: (input: CreateGroupInput) => Promise<ChatInvite>;
-  joinByAccessCode: (input: JoinInviteInput) => Promise<{ ok: true; chatId: string } | { ok: false; reason: string }>;
+  joinByAccessCode: (
+    input: JoinInviteInput
+  ) => Promise<{ ok: true; chatId: string } | { ok: false; reason: string }>;
   updateGroupLimit: (chatId: string, memberLimit: number) => void;
+  rotateInvite: (chatId: string) => ChatInvite | null;
   updateChatSettings: (input: {
     chatId: string;
     title: string;
@@ -127,7 +133,9 @@ function validateGroupPhones(phones: string[]) {
     return { ok: false as const, reason: "Для группы разрешены только 8-значные номера." };
   }
 
-  if (normalizedPhones.length !== phones.map((phone) => normalizePhone(phone)).filter(Boolean).length) {
+  if (
+    normalizedPhones.length !== phones.map((phone) => normalizePhone(phone)).filter(Boolean).length
+  ) {
     return { ok: false as const, reason: "Одинаковые номера в группе запрещены." };
   }
 
@@ -142,20 +150,44 @@ export const useChatStore = create<ChatState>()(
       chatSecretsByChatId: {},
       currentChatId: "",
       loading: false,
+      error: null,
       setCurrentChatId: (chatId) => set({ currentChatId: chatId }),
       hydrateChats: async (user) => {
-        set({ loading: true });
+        set({ loading: true, error: null });
+        if (!isSupabaseConfigured) {
+          const currentChats = get().chats;
+          const chats = currentChats.length > 0 ? currentChats : createDemoChats(user);
+          const messages = createDemoMessages(user);
+          const messageStore = useMessageStore.getState();
+          for (const [chatId, chatMessages] of Object.entries(messages)) {
+            if ((messageStore.messagesByChatId[chatId] ?? []).length === 0) {
+              messageStore.setMessages(chatId, chatMessages);
+            }
+          }
+          set((state) => ({
+            chats,
+            invites: state.invites.length > 0 ? state.invites : createDemoInvites(user),
+            currentChatId: state.currentChatId || chats[0]?.id || "",
+            loading: false
+          }));
+          return;
+        }
         try {
           const chats = await fetchRemoteChats(user);
           set((state) => ({
             chats: chats.map((chat: Chat) => {
-              const localInvite = state.invites.find((invite: ChatInvite) => invite.chatId === chat.id);
+              const localInvite = state.invites.find(
+                (invite: ChatInvite) => invite.chatId === chat.id
+              );
               return localInvite ? { ...chat, inviteId: localInvite.id } : chat;
             }),
             loading: false
           }));
         } catch {
-          set({ loading: false });
+          set({
+            loading: false,
+            error: "Не удалось загрузить чаты. Проверьте подключение и повторите."
+          });
         }
       },
       createDirectChat: async ({ title, recipientPhone, user }) => {
@@ -225,11 +257,15 @@ export const useChatStore = create<ChatState>()(
       joinByAccessCode: async ({
         accessCode,
         user
-      }: JoinInviteInput): Promise<{ ok: true; chatId: string } | { ok: false; reason: string }> => {
+      }: JoinInviteInput): Promise<
+        { ok: true; chatId: string } | { ok: false; reason: string }
+      > => {
         const normalizedAccessCode = accessCode.trim().toUpperCase();
         const normalizedUserPhone = normalizePhone(user.phone);
 
-        const localInvite = get().invites.find((invite: ChatInvite) => invite.accessCode === normalizedAccessCode);
+        const localInvite = get().invites.find(
+          (invite: ChatInvite) => invite.accessCode === normalizedAccessCode
+        );
 
         if (localInvite) {
           const invitePhones = localInvite.allowedPhones;
@@ -285,10 +321,7 @@ export const useChatStore = create<ChatState>()(
         } catch (error) {
           return {
             ok: false as const,
-            reason:
-              error instanceof Error
-                ? error.message
-                : "Не удалось подключиться по коду."
+            reason: error instanceof Error ? error.message : "Не удалось подключиться по коду."
           };
         }
       },
@@ -312,6 +345,24 @@ export const useChatStore = create<ChatState>()(
               : invite
           )
         })),
+      rotateInvite: (chatId: string) => {
+        const current = get().invites.find((invite) => invite.chatId === chatId);
+        if (!current) return null;
+        const draft = {
+          ...current,
+          id: crypto.randomUUID(),
+          accessCode: generateAccessCode(),
+          createdAt: new Date().toISOString()
+        };
+        const nextInvite: ChatInvite = { ...draft, token: buildInviteToken(draft) };
+        set((state) => ({
+          invites: [nextInvite, ...state.invites.filter((invite) => invite.chatId !== chatId)],
+          chats: state.chats.map((chat) =>
+            chat.id === chatId ? { ...chat, inviteId: nextInvite.id } : chat
+          )
+        }));
+        return nextInvite;
+      },
       updateChatSettings: async ({
         chatId,
         title,
@@ -367,7 +418,8 @@ export const useChatStore = create<ChatState>()(
           invites: [],
           chatSecretsByChatId: {},
           currentChatId: "",
-          loading: false
+          loading: false,
+          error: null
         });
       }
     }),

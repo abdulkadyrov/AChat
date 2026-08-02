@@ -32,7 +32,11 @@ export function QrCodeCard({ value, title }: QrCodeCardProps) {
     <div className="text-center">
       {title && <p className="mb-3 text-sm font-semibold">{title}</p>}
       <div className="mx-auto flex h-64 w-64 items-center justify-center rounded-[24px] border border-slate-200 bg-white p-3 dark:border-white/10">
-        {src ? <img src={src} alt="QR code" className="h-56 w-56" /> : <div className="h-56 w-56 animate-pulse rounded-2xl bg-slate-100" />}
+        {src ? (
+          <img src={src} alt="QR code" className="h-56 w-56" />
+        ) : (
+          <div className="h-56 w-56 animate-pulse rounded-2xl bg-[var(--color-surface-secondary)]" />
+        )}
       </div>
     </div>
   );

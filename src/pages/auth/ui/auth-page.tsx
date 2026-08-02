@@ -1,69 +1,98 @@
-import { useState } from "react";
-import { ShieldCheck } from "lucide-react";
+import { useState, type FormEvent } from "react";
+import { ShieldCheck, Users } from "lucide-react";
 import { useAuthStore, type AuthState } from "@/shared/model/auth-store";
-import { SectionCard } from "@/shared/ui/section-card";
 
 export function AuthPage() {
   const signInLocal = useAuthStore((state: AuthState) => state.signInLocal);
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [about, setAbout] = useState("");
+  const valid = name.trim().length >= 2 && phone.replace(/\D/g, "").length >= 8;
 
-  const isDisabled = !name.trim() || !phone.trim();
+  function submit(event: FormEvent) {
+    event.preventDefault();
+    if (valid) signInLocal({ name, phone, about });
+  }
 
   return (
-    <div className="mx-auto flex min-h-screen w-full max-w-xl items-center px-4 py-10">
-      <SectionCard className="w-full p-6 sm:p-8">
-        <div className="mb-6 flex items-center gap-3">
-          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-accent text-white">
-            <ShieldCheck className="h-6 w-6" />
-          </div>
+    <main className="flex min-h-[calc(100dvh-env(safe-area-inset-top)-env(safe-area-inset-bottom))] items-center justify-center bg-[var(--color-background)] p-4">
+      <div className="w-full max-w-md rounded-[24px] border border-[var(--color-border)] bg-[var(--color-surface)] p-6 shadow-xl shadow-black/5 sm:p-8">
+        <div className="flex items-center gap-3">
+          <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[var(--color-accent)] text-white">
+            <ShieldCheck aria-hidden="true" size={25} />
+          </span>
           <div>
-            <h1 className="text-2xl font-extrabold tracking-[-0.04em]">AChat</h1>
-            <p className="subtle-text">Вход в локальный MVP-профиль</p>
+            <h1 className="text-[24px] font-bold tracking-tight">AChat</h1>
+            <p className="text-[12px] text-[var(--color-text-secondary)]">
+              Защищённый семейный мессенджер
+            </p>
           </div>
         </div>
-
-        <div className="space-y-4">
+        <div className="mt-5 flex items-start gap-3 rounded-2xl bg-[var(--color-accent-soft)] p-3 text-[12px] leading-5 text-[var(--color-text-secondary)]">
+          <Users
+            aria-hidden="true"
+            size={19}
+            className="mt-0.5 shrink-0 text-[var(--color-accent)]"
+          />{" "}
+          Создайте локальный профиль. После подключения Supabase этот экран можно заменить на
+          OTP-вход без изменения остального интерфейса.
+        </div>
+        <form className="mt-6 space-y-4" onSubmit={submit}>
           <label className="block">
-            <span className="mb-2 block text-sm font-semibold">Имя</span>
+            <span className="mb-1.5 block text-[13px] font-medium">Ваше имя</span>
             <input
+              className="field"
               value={name}
               onChange={(event) => setName(event.target.value)}
-              placeholder="Например, Алекс"
-              className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 outline-none transition focus:border-accent dark:border-white/10 dark:bg-white/5"
+              placeholder="Например, Папа"
+              autoComplete="name"
+              required
             />
           </label>
           <label className="block">
-            <span className="mb-2 block text-sm font-semibold">Телефон</span>
+            <span className="mb-1.5 block text-[13px] font-medium">Телефон</span>
             <input
+              className="field"
               value={phone}
               onChange={(event) => setPhone(event.target.value)}
-              placeholder="+7 900 000-00-00"
-              className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 outline-none transition focus:border-accent dark:border-white/10 dark:bg-white/5"
+              placeholder="+7 999 123-45-67"
+              inputMode="tel"
+              autoComplete="tel"
+              required
             />
           </label>
           <label className="block">
-            <span className="mb-2 block text-sm font-semibold">О себе</span>
+            <span className="mb-1.5 block text-[13px] font-medium">
+              О себе{" "}
+              <span className="font-normal text-[var(--color-text-muted)]">· необязательно</span>
+            </span>
             <textarea
+              className="field min-h-20 resize-none"
               value={about}
               onChange={(event) => setAbout(event.target.value)}
-              rows={3}
-              placeholder="Короткий статус"
-              className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 outline-none transition focus:border-accent dark:border-white/10 dark:bg-white/5"
+              placeholder="Короткий семейный статус"
+              maxLength={140}
             />
           </label>
+          <button type="submit" className="primary-button w-full" disabled={!valid}>
+            Войти в приложение
+          </button>
+        </form>
+        <div className="my-4 flex items-center gap-3 text-[11px] text-[var(--color-text-muted)]">
+          <span className="h-px flex-1 bg-[var(--color-divider)]" />
+          или
+          <span className="h-px flex-1 bg-[var(--color-divider)]" />
         </div>
-
         <button
           type="button"
-          disabled={isDisabled}
-          onClick={() => signInLocal({ name, phone, about })}
-          className="mt-6 w-full rounded-2xl bg-accent px-4 py-3 font-semibold text-white transition disabled:cursor-not-allowed disabled:opacity-50"
+          className="secondary-button w-full"
+          onClick={() =>
+            signInLocal({ name: "Папа", phone: "+7 999 123-45-67", about: "Всегда на связи" })
+          }
         >
-          Войти в приложение
+          Открыть демо-семью
         </button>
-      </SectionCard>
-    </div>
+      </div>
+    </main>
   );
 }

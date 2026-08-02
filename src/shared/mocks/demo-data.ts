@@ -1,11 +1,13 @@
 import type {
   AuthSession,
   Chat,
+  ChatInvite,
   Family,
   FamilyMember,
   Message,
   UserProfile
 } from "@/shared/types/domain";
+import { buildInviteToken } from "@/shared/lib/invite/token";
 
 export const demoUsers: UserProfile[] = [
   {
@@ -143,6 +145,40 @@ export const demoChats: Chat[] = [
     inviteId: "invite-brother",
     targetPhone: "+79007001122",
     messageTtl: "7d"
+  },
+  {
+    id: "chat-sister",
+    familyId: demoFamily.id,
+    type: "direct",
+    title: "Сестра",
+    subtitle: "Отправила фото",
+    avatarGroup: ["https://i.pravatar.cc/80?img=5"],
+    unreadCount: 0,
+    lastMessageAt: "2026-06-20T09:30:00.000Z",
+    ownerId: currentUser.id,
+    participantIds: [currentUser.id, "user-sister"],
+    participantPhones: ["79001234567", "79005556188"],
+    memberLimit: 1,
+    inviteId: "invite-sister",
+    targetPhone: "+79005556188",
+    messageTtl: "30d"
+  },
+  {
+    id: "chat-grandma",
+    familyId: demoFamily.id,
+    type: "direct",
+    title: "Бабушка",
+    subtitle: "До встречи вечером",
+    avatarGroup: ["https://i.pravatar.cc/80?img=47"],
+    unreadCount: 0,
+    lastMessageAt: "2026-06-19T18:20:00.000Z",
+    ownerId: currentUser.id,
+    participantIds: [currentUser.id, "user-grandma"],
+    participantPhones: ["79001234567", "79004442111"],
+    memberLimit: 1,
+    inviteId: "invite-grandma",
+    targetPhone: "+79004442111",
+    messageTtl: "off"
   }
 ];
 
@@ -212,6 +248,7 @@ export const demoMessages: Record<string, Message[]> = {
       replyTo: null,
       preview: "Голосовое сообщение",
       durationSec: 8,
+      mediaDataUrl: "https://actions.google.com/sounds/v1/cartoon/wood_plank_flicks.ogg",
       status: "sent"
     },
     {
@@ -226,6 +263,8 @@ export const demoMessages: Record<string, Message[]> = {
       replyTo: null,
       preview: "Фото",
       mediaPath: "chat-family/msg-6/lake.enc",
+      mediaDataUrl:
+        "https://images.unsplash.com/photo-1500534314209-a25ddb2bd429?auto=format&fit=crop&w=960&q=82",
       status: "read"
     }
   ],
@@ -258,5 +297,104 @@ export const demoMessages: Record<string, Message[]> = {
       preview: "Хорошо 👍",
       status: "sent"
     }
+  ],
+  "chat-sister": [
+    {
+      id: "msg-9",
+      chatId: "chat-sister",
+      senderId: "user-sister",
+      ciphertext: "cipher-9",
+      iv: "iv-9",
+      type: "image",
+      createdAt: "2026-06-20T09:30:00.000Z",
+      expiresAt: "2026-07-20T09:30:00.000Z",
+      replyTo: null,
+      preview: "Смотри, как красиво!",
+      mediaDataUrl:
+        "https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&fit=crop&w=960&q=82",
+      status: "delivered"
+    }
+  ],
+  "chat-grandma": [
+    {
+      id: "msg-10",
+      chatId: "chat-grandma",
+      senderId: "user-grandma",
+      ciphertext: "cipher-10",
+      iv: "iv-10",
+      type: "text",
+      createdAt: "2026-06-19T18:20:00.000Z",
+      expiresAt: null,
+      replyTo: null,
+      preview: "До встречи вечером",
+      status: "read"
+    }
   ]
 };
+
+function todayAt(hour: number, minute: number) {
+  const value = new Date();
+  value.setHours(hour, minute, 0, 0);
+  return value.toISOString();
+}
+
+export function createDemoChats(user: UserProfile): Chat[] {
+  const chatTimes = [
+    todayAt(12, 35),
+    todayAt(11, 20),
+    todayAt(10, 5),
+    todayAt(9, 30),
+    new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
+  ];
+
+  return demoChats.map((chat, index) => ({
+    ...chat,
+    ownerId: user.id,
+    participantIds: chat.participantIds.map((id) => (id === currentUser.id ? user.id : id)),
+    participantPhones: chat.participantPhones.map((phone, phoneIndex) =>
+      phoneIndex === 0 ? user.phone.replace(/\D/g, "") : phone
+    ),
+    lastMessageAt: chatTimes[index] ?? chat.lastMessageAt
+  }));
+}
+
+export function createDemoMessages(user: UserProfile): Record<string, Message[]> {
+  return Object.fromEntries(
+    Object.entries(demoMessages).map(([chatId, messages]) => [
+      chatId,
+      messages.map((message, index) => ({
+        ...message,
+        senderId: message.senderId === currentUser.id ? user.id : message.senderId,
+        createdAt:
+          chatId === "chat-grandma"
+            ? new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
+            : todayAt(12 + Math.floor(index / 10), 30 + (index % 10)),
+        expiresAt:
+          message.expiresAt === null
+            ? null
+            : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
+      }))
+    ])
+  );
+}
+
+export function createDemoInvites(user: UserProfile): ChatInvite[] {
+  return createDemoChats(user).map((chat) => {
+    const draft = {
+      id: chat.inviteId ?? `invite-${chat.id}`,
+      chatId: chat.id,
+      kind: chat.type,
+      title: chat.title,
+      createdBy: user.id,
+      createdByPhone: user.phone.replace(/\D/g, ""),
+      accessCode:
+        chat.id === "chat-family" ? "F7M2Q9" : `A${chat.id.slice(-4).toUpperCase()}7`.slice(0, 6),
+      allowedPhones: chat.participantPhones.slice(1),
+      allowedPhone: chat.participantPhones[1] ?? null,
+      maxParticipants: Math.max(chat.participantIds.length - 1, 1),
+      createdAt: new Date().toISOString(),
+      chatSecret: ""
+    };
+    return { ...draft, token: buildInviteToken(draft) };
+  });
+}
