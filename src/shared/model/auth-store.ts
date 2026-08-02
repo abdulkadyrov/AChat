@@ -37,9 +37,10 @@ export const useAuthStore = create<AuthState>()(
       session: null,
       setSession: (user, session) => set({ user, session }),
       setRemoteUserId: (userId) =>
-        set((state) => ({
-          user: state.user ? { ...state.user, id: userId } : state.user
-        })),
+        set((state) => {
+          if (!state.user || state.user.id === userId) return state;
+          return { user: { ...state.user, id: userId } };
+        }),
       signInLocal: ({ name, phone, about }) =>
         set({
           user: {
