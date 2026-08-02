@@ -1,7 +1,15 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { buildInviteToken } from "@/shared/lib/invite/token";
 import { useChatStore } from "./chat-store";
 import type { ChatInvite, UserProfile } from "@/shared/types/domain";
+
+vi.mock("@/shared/config/env", () => ({
+  env: {
+    supabaseUrl: "https://example.supabase.co",
+    supabaseKey: "public-anon-key"
+  },
+  isSupabaseConfigured: false
+}));
 
 const user: UserProfile = {
   id: "joining-user",

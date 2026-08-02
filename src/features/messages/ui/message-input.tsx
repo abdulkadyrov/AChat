@@ -85,14 +85,18 @@ export function MessageInput({ chatId, replyPreview, ttlLabel, onSent }: Message
 
   async function sendImage() {
     if (!imagePreview) return;
-    await sendMediaMessage.mutateAsync({
-      chatId,
-      type: "image",
-      dataUrl: imagePreview.dataUrl,
-      preview: imagePreview.file.name || "Фото"
-    });
-    setImagePreview(null);
-    onSent?.();
+    try {
+      await sendMediaMessage.mutateAsync({
+        chatId,
+        type: "image",
+        dataUrl: imagePreview.dataUrl,
+        preview: imagePreview.file.name || "Фото"
+      });
+      setImagePreview(null);
+      onSent?.();
+    } catch {
+      showToast("Не удалось отправить фото. Повторите попытку");
+    }
   }
 
   async function sendFile(file: File | null) {
@@ -101,15 +105,19 @@ export function MessageInput({ chatId, replyPreview, ttlLabel, onSent }: Message
       showToast("Файл больше 20 МБ");
       return;
     }
-    await sendMediaMessage.mutateAsync({
-      chatId,
-      type: "file",
-      dataUrl: await fileToDataUrl(file),
-      preview: file.name,
-      fileName: file.name,
-      fileSize: file.size
-    });
-    onSent?.();
+    try {
+      await sendMediaMessage.mutateAsync({
+        chatId,
+        type: "file",
+        dataUrl: await fileToDataUrl(file),
+        preview: file.name,
+        fileName: file.name,
+        fileSize: file.size
+      });
+      onSent?.();
+    } catch {
+      showToast("Не удалось отправить файл. Повторите попытку");
+    }
   }
 
   async function startRecording() {
@@ -163,15 +171,19 @@ export function MessageInput({ chatId, replyPreview, ttlLabel, onSent }: Message
 
   async function sendVoice() {
     if (!voicePreview) return;
-    await sendMediaMessage.mutateAsync({
-      chatId,
-      type: "voice",
-      dataUrl: voicePreview.dataUrl,
-      preview: "Голосовое сообщение",
-      durationSec: Math.ceil(voicePreview.durationSec)
-    });
-    setVoicePreview(null);
-    onSent?.();
+    try {
+      await sendMediaMessage.mutateAsync({
+        chatId,
+        type: "voice",
+        dataUrl: voicePreview.dataUrl,
+        preview: "Голосовое сообщение",
+        durationSec: Math.ceil(voicePreview.durationSec)
+      });
+      setVoicePreview(null);
+      onSent?.();
+    } catch {
+      showToast("Не удалось отправить голосовое. Повторите попытку");
+    }
   }
 
   return (

@@ -19,6 +19,7 @@ A responsive family-messenger PWA built with React, TypeScript, Zustand, React Q
 - System/light/dark themes applied before the first React render
 - PWA manifest, install icons, service worker precache and IndexedDB outbox foundation
 - Supabase schema with RLS, authorization helpers, invite validation, indexes and Realtime publication
+- Cross-device message refresh plus Supabase Realtime subscriptions with visible connection errors
 
 ## Run locally
 

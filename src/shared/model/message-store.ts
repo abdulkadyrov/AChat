@@ -5,6 +5,7 @@ export interface MessageState {
   messagesByChatId: Record<string, Message[]>;
   sendingState: "idle" | "sending" | "error";
   setMessages: (chatId: string, messages: Message[]) => void;
+  mergeMessages: (chatId: string, messages: Message[]) => void;
   enqueueMessage: (message: Message) => void;
   removeMessage: (chatId: string, messageId: string) => void;
   updateMessage: (chatId: string, messageId: string, patch: Partial<Message>) => void;
@@ -23,6 +24,25 @@ export const useMessageStore = create<MessageState>()((set) => ({
         [chatId]: messages
       }
     })),
+  mergeMessages: (chatId, messages) =>
+    set((state) => {
+      const merged = [...(state.messagesByChatId[chatId] ?? []), ...messages]
+        .filter(
+          (message, index, all) =>
+            all.findIndex((candidate) => candidate.id === message.id) === index
+        )
+        .sort(
+          (first, second) =>
+            new Date(first.createdAt).getTime() - new Date(second.createdAt).getTime()
+        );
+
+      return {
+        messagesByChatId: {
+          ...state.messagesByChatId,
+          [chatId]: merged
+        }
+      };
+    }),
   enqueueMessage: (message) =>
     set((state) => ({
       messagesByChatId: {

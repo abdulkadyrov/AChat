@@ -1,5 +1,6 @@
 import { useMutation } from "@tanstack/react-query";
 import { queueOutgoingMessage } from "@/shared/lib/offline/db";
+import { isSupabaseConfigured } from "@/shared/config/env";
 import { computeExpiresAt } from "@/shared/lib/ttl/messages";
 import { useAuthStore, type AuthState } from "@/shared/model/auth-store";
 import { useChatStore, type ChatState } from "@/shared/model/chat-store";
@@ -76,24 +77,24 @@ export function useSendMessage() {
         replyTo
       });
 
-      let message = fallbackMessage;
-      if (chatSecret) {
-        try {
-          message = await sendRemoteTextMessage({
-            chatId,
-            user,
-            chatSecret,
-            content,
-            ttl,
-            replyTo
-          });
-        } catch {
-          await queueOutgoingMessage(fallbackMessage).catch(() => undefined);
-        }
-      } else {
+      if (!isSupabaseConfigured) {
         await queueOutgoingMessage(fallbackMessage).catch(() => undefined);
+        enqueueMessage(fallbackMessage);
+        setReplyTo(null);
+        setSendingState("idle");
+        return fallbackMessage;
       }
 
+      if (!chatSecret) throw new Error("Ключ синхронизации чата не найден");
+
+      const message = await sendRemoteTextMessage({
+        chatId,
+        user,
+        chatSecret,
+        content,
+        ttl,
+        replyTo
+      });
       enqueueMessage(message);
       setReplyTo(null);
       setSendingState("idle");
@@ -144,27 +145,29 @@ export function useSendMediaMessage() {
         replyTo
       });
 
-      let message = fallbackMessage;
-      if (chatSecret && input.type !== "file") {
-        try {
-          message = await sendRemoteMediaMessage({
-            chatId: input.chatId,
-            type: input.type,
-            dataUrl: input.dataUrl,
-            preview: input.preview,
-            durationSec: input.durationSec,
-            user,
-            chatSecret,
-            ttl,
-            replyTo
-          });
-        } catch {
-          await queueOutgoingMessage(fallbackMessage).catch(() => undefined);
-        }
-      } else {
+      if (!isSupabaseConfigured) {
         await queueOutgoingMessage(fallbackMessage).catch(() => undefined);
+        enqueueMessage(fallbackMessage);
+        setReplyTo(null);
+        setSendingState("idle");
+        return fallbackMessage;
       }
 
+      if (!chatSecret) throw new Error("Ключ синхронизации чата не найден");
+
+      const message = await sendRemoteMediaMessage({
+        chatId: input.chatId,
+        type: input.type,
+        dataUrl: input.dataUrl,
+        preview: input.preview,
+        durationSec: input.durationSec,
+        fileName: input.fileName,
+        fileSize: input.fileSize,
+        user,
+        chatSecret,
+        ttl,
+        replyTo
+      });
       enqueueMessage(message);
       setReplyTo(null);
       setSendingState("idle");

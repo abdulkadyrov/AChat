@@ -1,6 +1,7 @@
 import { useEffect, useState, type PropsWithChildren } from "react";
 import { WifiOff } from "lucide-react";
 import { useLocation } from "react-router-dom";
+import { isSupabaseConfigured } from "@/shared/config/env";
 import { useUiStore, type UiState } from "@/shared/model/ui-store";
 import { BottomNavigation } from "@/widgets/navigation/ui/bottom-navigation";
 
@@ -33,7 +34,13 @@ export function AppShell({ children }: PropsWithChildren) {
       {!isOnline && (
         <div className="offline-banner" role="status">
           <WifiOff aria-hidden="true" size={16} />
-          Нет сети — сообщения попадут в очередь
+          Нет сети — отправка временно недоступна
+        </div>
+      )}
+      {isOnline && !isSupabaseConfigured && (
+        <div className="offline-banner" role="status">
+          <WifiOff aria-hidden="true" size={16} />
+          Демо-режим — сообщения видны только на этом устройстве
         </div>
       )}
       <main className="app-main">{children}</main>

@@ -181,21 +181,21 @@ export const useChatStore = create<ChatState>()(
       createDirectChat: async ({ title, user }) => {
         if (!title.trim()) throw new Error("Введите название чата.");
 
-        const { chat, invite, chatSecret } = await createRemoteChat({
-          title,
-          type: "direct",
-          allowedPhones: [],
-          memberLimit: 1,
-          user
-        }).catch(() =>
-          buildLocalChatInvite({
-            title,
-            type: "direct",
-            allowedPhones: [],
-            memberLimit: 1,
-            user
-          })
-        );
+        const { chat, invite, chatSecret } = isSupabaseConfigured
+          ? await createRemoteChat({
+              title,
+              type: "direct",
+              allowedPhones: [],
+              memberLimit: 1,
+              user
+            })
+          : await buildLocalChatInvite({
+              title,
+              type: "direct",
+              allowedPhones: [],
+              memberLimit: 1,
+              user
+            });
 
         set((state) => ({
           chats: [chat, ...state.chats.filter((item: Chat) => item.id !== chat.id)],
@@ -215,21 +215,21 @@ export const useChatStore = create<ChatState>()(
           throw new Error("Укажите количество участников от 1 до 50.");
         }
 
-        const { chat, invite, chatSecret } = await createRemoteChat({
-          title,
-          type: "group",
-          allowedPhones: [],
-          memberLimit,
-          user
-        }).catch(() =>
-          buildLocalChatInvite({
-            title,
-            type: "group",
-            allowedPhones: [],
-            memberLimit,
-            user
-          })
-        );
+        const { chat, invite, chatSecret } = isSupabaseConfigured
+          ? await createRemoteChat({
+              title,
+              type: "group",
+              allowedPhones: [],
+              memberLimit,
+              user
+            })
+          : await buildLocalChatInvite({
+              title,
+              type: "group",
+              allowedPhones: [],
+              memberLimit,
+              user
+            });
 
         set((state) => ({
           chats: [chat, ...state.chats.filter((item: Chat) => item.id !== chat.id)],

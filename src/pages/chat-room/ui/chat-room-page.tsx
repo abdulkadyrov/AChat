@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ArrowDown, ChevronUp, MessageCircle } from "lucide-react";
+import { ArrowDown, ChevronUp, MessageCircle, RefreshCw, WifiOff } from "lucide-react";
 import { Link, useParams } from "react-router-dom";
 import { MessageBubble } from "@/entities/message/ui/message-bubble";
 import { ChatHeader } from "@/features/messages/ui/chat-header";
@@ -11,6 +11,7 @@ import {
   fetchRemoteMessages,
   subscribeToRemoteMessages
 } from "@/shared/lib/supabase/messaging";
+import { isSupabaseConfigured } from "@/shared/config/env";
 import { formatDateDivider } from "@/shared/lib/utils/date";
 import { isMessageExpired } from "@/shared/lib/ttl/messages";
 import { useChatStore, type ChatState } from "@/shared/model/chat-store";
@@ -38,7 +39,7 @@ export function ChatRoomView({ chatId, embedded = false }: ChatRoomViewProps) {
   const chats = useChatStore((state: ChatState) => state.chats);
   const chatSecretsByChatId = useChatStore((state: ChatState) => state.chatSecretsByChatId);
   const messagesByChatId = useMessageStore((state: MessageState) => state.messagesByChatId);
-  const setMessages = useMessageStore((state: MessageState) => state.setMessages);
+  const mergeMessages = useMessageStore((state: MessageState) => state.mergeMessages);
   const enqueueMessage = useMessageStore((state: MessageState) => state.enqueueMessage);
   const replyTo = useUiStore((state: UiState) => state.replyTo);
   const chat = chats.find((item: Chat) => item.id === chatId);
@@ -49,27 +50,63 @@ export function ChatRoomView({ chatId, embedded = false }: ChatRoomViewProps) {
   const [isNearBottom, setNearBottom] = useState(true);
   const [hasNewMessages, setHasNewMessages] = useState(false);
   const [highlightedId, setHighlightedId] = useState<string | null>(null);
+  const [syncState, setSyncState] = useState<"local" | "connecting" | "live" | "error">(
+    isSupabaseConfigured ? "connecting" : "local"
+  );
+  const [syncRetry, setSyncRetry] = useState(0);
 
   useEffect(() => {
     if (!chat) return;
+    if (!isSupabaseConfigured) {
+      setSyncState("local");
+      return;
+    }
     const chatSecret = chatSecretsByChatId[chat.id];
-    if (!chatSecret) return;
+    if (!chatSecret) {
+      setSyncState("error");
+      return;
+    }
     let active = true;
-    fetchRemoteMessages(chat.id, chatSecret)
-      .then((messages) => {
-        if (active) setMessages(chat.id, messages);
-      })
-      .catch(() => undefined);
-    const channel = subscribeToRemoteMessages(chat.id, (row) => {
-      decryptRemoteMessage(row, chatSecret)
-        .then(enqueueMessage)
-        .catch(() => undefined);
-    });
+    setSyncState("connecting");
+
+    const refreshMessages = () =>
+      fetchRemoteMessages(chat.id, chatSecret)
+        .then((messages) => {
+          if (active) mergeMessages(chat.id, messages);
+        })
+        .catch(() => {
+          if (active) setSyncState("error");
+        });
+
+    void refreshMessages();
+    const channel = subscribeToRemoteMessages(
+      chat.id,
+      (row) => {
+        decryptRemoteMessage(row, chatSecret)
+          .then(enqueueMessage)
+          .catch(() => setSyncState("error"));
+      },
+      (status) => {
+        if (!active) return;
+        if (status === "SUBSCRIBED") setSyncState("live");
+        if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") setSyncState("error");
+      }
+    );
+
+    const handleOnline = () => void refreshMessages();
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible") void refreshMessages();
+    };
+    window.addEventListener("online", handleOnline);
+    document.addEventListener("visibilitychange", handleVisibility);
+
     return () => {
       active = false;
       channel.unsubscribe();
+      window.removeEventListener("online", handleOnline);
+      document.removeEventListener("visibilitychange", handleVisibility);
     };
-  }, [chat, chatSecretsByChatId, enqueueMessage, setMessages]);
+  }, [chat, chatSecretsByChatId, enqueueMessage, mergeMessages, syncRetry]);
 
   const allMessages = useMemo(
     () =>
@@ -136,6 +173,36 @@ export function ChatRoomView({ chatId, embedded = false }: ChatRoomViewProps) {
       aria-label={`Чат ${chat.title}`}
     >
       <ChatHeader chat={chat} embedded={embedded} />
+      {syncState !== "live" && (
+        <div
+          role="status"
+          className={`flex min-h-9 items-center justify-center gap-2 px-3 text-center text-[11px] ${
+            syncState === "error"
+              ? "bg-[color-mix(in_srgb,var(--color-danger)_12%,transparent)] text-[var(--color-danger)]"
+              : "bg-[var(--color-surface-secondary)] text-[var(--color-text-secondary)]"
+          }`}
+        >
+          {syncState === "connecting" ? (
+            <RefreshCw aria-hidden="true" size={14} className="animate-spin" />
+          ) : (
+            <WifiOff aria-hidden="true" size={14} />
+          )}
+          {syncState === "local" && "Демо-режим: сообщения остаются на этом устройстве"}
+          {syncState === "connecting" && "Подключаем синхронизацию…"}
+          {syncState === "error" && (
+            <>
+              Синхронизация недоступна
+              <button
+                type="button"
+                className="font-bold underline underline-offset-2"
+                onClick={() => setSyncRetry((value) => value + 1)}
+              >
+                Повторить
+              </button>
+            </>
+          )}
+        </div>
+      )}
       <div
         ref={scrollerRef}
         className="chat-pattern min-h-0 flex-1 overflow-y-auto overscroll-contain py-3"

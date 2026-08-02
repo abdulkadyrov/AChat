@@ -110,23 +110,22 @@ export async function createRemoteChat(input: {
   const createdAt = new Date().toISOString();
   const allowedPhones = input.allowedPhones.map((phone) => normalizePhone(phone));
   const accessCode = generateAccessCode();
+  const chatId = crypto.randomUUID();
+  const chatRow: ChatRow = {
+    id: chatId,
+    type: input.type,
+    title: input.title.trim(),
+    owner_id: ownerId,
+    target_phone: allowedPhones[0] ?? null,
+    allowed_phones: allowedPhones,
+    member_limit: input.memberLimit,
+    message_ttl: "7d",
+    created_at: createdAt
+  };
 
-  const { data: chatRow, error: chatError } = await supabase
-    .from("chats")
-    .insert({
-      id: crypto.randomUUID(),
-      type: input.type,
-      title: input.title.trim(),
-      owner_id: ownerId,
-      target_phone: allowedPhones[0] ?? null,
-      allowed_phones: allowedPhones,
-      member_limit: input.memberLimit,
-      message_ttl: "7d"
-    })
-    .select()
-    .single<ChatRow>();
+  const { error: chatError } = await supabase.from("chats").insert(chatRow);
 
-  if (chatError || !chatRow) throw chatError ?? new Error("Unable to create chat");
+  if (chatError) throw chatError;
 
   const { error: memberError } = await supabase.from("chat_members").insert({
     chat_id: chatRow.id,
@@ -254,7 +253,9 @@ export async function fetchRemoteMessages(chatId: string, chatSecret: string) {
     rows.map(async (row) => {
       const decrypted = await decryptText(row.ciphertext, row.iv, key).catch(() => "");
       const mediaPayload =
-        row.type === "image" || row.type === "voice" ? safeParseMediaPayload(decrypted) : null;
+        row.type === "image" || row.type === "voice" || row.type === "file"
+          ? safeParseMediaPayload(decrypted)
+          : null;
       return {
         id: row.id,
         chatId: row.chat_id,
@@ -269,6 +270,8 @@ export async function fetchRemoteMessages(chatId: string, chatSecret: string) {
         mediaPath: row.media_path ?? undefined,
         mediaDataUrl: mediaPayload?.dataUrl,
         durationSec: mediaPayload?.durationSec,
+        fileName: mediaPayload?.fileName,
+        fileSize: mediaPayload?.fileSize,
         status: "sent" as const
       } satisfies Message;
     })
@@ -329,6 +332,8 @@ function safeParseMediaPayload(value: string) {
       preview: string;
       dataUrl: string;
       durationSec?: number;
+      fileName?: string;
+      fileSize?: number;
     };
   } catch {
     return null;
@@ -340,10 +345,12 @@ export async function sendRemoteMediaMessage(input: {
   user: UserProfile;
   chatSecret: string;
   ttl: MessageTTL;
-  type: "image" | "voice";
+  type: "image" | "voice" | "file";
   dataUrl: string;
   preview: string;
   durationSec?: number;
+  fileName?: string;
+  fileSize?: number;
   replyTo?: string | null;
 }) {
   const remoteUserId = await ensureSupabaseIdentity(input.user);
@@ -353,7 +360,9 @@ export async function sendRemoteMediaMessage(input: {
     JSON.stringify({
       preview: input.preview,
       dataUrl: input.dataUrl,
-      durationSec: input.durationSec
+      durationSec: input.durationSec,
+      fileName: input.fileName,
+      fileSize: input.fileSize
     }),
     key
   );
@@ -389,6 +398,8 @@ export async function sendRemoteMediaMessage(input: {
     preview: input.preview,
     mediaDataUrl: input.dataUrl,
     durationSec: input.durationSec,
+    fileName: input.fileName,
+    fileSize: input.fileSize,
     status: "sent" as const
   } satisfies Message;
 }
@@ -431,23 +442,26 @@ export async function deleteRemoteChat(chatId: string) {
 
 export function subscribeToRemoteMessages(
   chatId: string,
-  onInsert: (row: MessageRow) => void
+  onInsert: (row: MessageRow) => void,
+  onStatus?: (status: string) => void
 ): RealtimeChannel {
   return supabase
-    .channel(`messages:${chatId}`)
+    .channel(`messages:${chatId}:${crypto.randomUUID()}`)
     .on(
       "postgres_changes",
       { event: "INSERT", schema: "public", table: "messages", filter: `chat_id=eq.${chatId}` },
       (payload) => onInsert(payload.new as MessageRow)
     )
-    .subscribe();
+    .subscribe((status) => onStatus?.(status));
 }
 
 export async function decryptRemoteMessage(row: MessageRow, chatSecret: string) {
   const key = await importDeviceKey(chatSecret);
-  const decrypted = await decryptText(row.ciphertext, row.iv, key).catch(() => "");
+  const decrypted = await decryptText(row.ciphertext, row.iv, key);
   const mediaPayload =
-    row.type === "image" || row.type === "voice" ? safeParseMediaPayload(decrypted) : null;
+    row.type === "image" || row.type === "voice" || row.type === "file"
+      ? safeParseMediaPayload(decrypted)
+      : null;
 
   return {
     id: row.id,
@@ -463,6 +477,8 @@ export async function decryptRemoteMessage(row: MessageRow, chatSecret: string) 
     mediaPath: row.media_path ?? undefined,
     mediaDataUrl: mediaPayload?.dataUrl,
     durationSec: mediaPayload?.durationSec,
+    fileName: mediaPayload?.fileName,
+    fileSize: mediaPayload?.fileSize,
     status: "sent" as const
   } satisfies Message;
 }
