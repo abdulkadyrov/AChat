@@ -3,7 +3,8 @@ import type { MessageTTL } from "@/shared/types/domain";
 const ttlToMs: Record<Exclude<MessageTTL, "off">, number> = {
   "24h": 24 * 60 * 60 * 1000,
   "7d": 7 * 24 * 60 * 60 * 1000,
-  "30d": 30 * 24 * 60 * 60 * 1000
+  "30d": 30 * 24 * 60 * 60 * 1000,
+  "90d": 90 * 24 * 60 * 60 * 1000
 };
 
 export function computeExpiresAt(createdAt: string, ttl: MessageTTL) {

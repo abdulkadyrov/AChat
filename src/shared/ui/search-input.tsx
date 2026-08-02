@@ -7,13 +7,15 @@ interface SearchInputProps {
 
 export function SearchInput({ value, onChange }: SearchInputProps) {
   return (
-    <label className="glass-panel flex items-center gap-3 rounded-2xl px-4 py-3">
-      <Search className="h-4 w-4 text-ink-soft dark:text-slate-400" />
+    <label className="flex h-11 items-center gap-3 rounded-[14px] bg-[var(--color-surface-secondary)] px-3">
+      <Search aria-hidden="true" size={19} className="text-[var(--color-text-secondary)]" />
+      <span className="visually-hidden">Поиск по чатам</span>
       <input
         value={value}
         onChange={(event) => onChange(event.target.value)}
         placeholder="Поиск"
-        className="w-full bg-transparent outline-none placeholder:text-ink-soft/80 dark:placeholder:text-slate-500"
+        aria-label="Поиск по чатам"
+        className="w-full bg-transparent outline-none placeholder:text-[var(--color-text-muted)]"
       />
     </label>
   );

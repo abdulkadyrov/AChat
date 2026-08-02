@@ -78,11 +78,7 @@ export async function generateSharedSecret() {
 export async function encryptBytes(bytes: Uint8Array, key: CryptoKey) {
   const iv = crypto.getRandomValues(new Uint8Array(12));
   const plainBytes = Uint8Array.from(bytes);
-  const cipherBuffer = await crypto.subtle.encrypt(
-    { name: algorithm, iv },
-    key,
-    plainBytes
-  );
+  const cipherBuffer = await crypto.subtle.encrypt({ name: algorithm, iv }, key, plainBytes);
 
   return {
     ciphertext: bytesToBase64(new Uint8Array(cipherBuffer)),

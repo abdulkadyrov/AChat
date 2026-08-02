@@ -1,72 +1,128 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { Camera } from "lucide-react";
 import { useAuthStore, type AuthState } from "@/shared/model/auth-store";
 import { useUiStore, type UiState } from "@/shared/model/ui-store";
+import { Avatar } from "@/shared/ui/avatar";
+import { Sheet } from "@/shared/ui/sheet";
+
+function fileToDataUrl(file: File) {
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result));
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
 
 export function ProfileSheet() {
   const modalState = useUiStore((state: UiState) => state.modalState);
   const setModalState = useUiStore((state: UiState) => state.setModalState);
+  const showToast = useUiStore((state: UiState) => state.showToast);
   const user = useAuthStore((state: AuthState) => state.user);
   const updateProfile = useAuthStore((state: AuthState) => state.updateProfile);
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [about, setAbout] = useState("");
+  const [avatarUrl, setAvatarUrl] = useState("");
+  const fileRef = useRef<HTMLInputElement>(null);
+  const open = modalState === "profile";
 
   useEffect(() => {
-    if (modalState === "profile" && user) {
+    if (open && user) {
       setName(user.name);
       setPhone(user.phone);
       setAbout(user.about);
+      setAvatarUrl(user.avatarUrl);
     }
-  }, [modalState, user]);
+  }, [open, user]);
 
-  if (modalState !== "profile" || !user) return null;
+  if (!user) return null;
+  const valid = name.trim().length >= 2 && phone.replace(/\D/g, "").length >= 8;
+
+  function close() {
+    setModalState(null);
+  }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end bg-slate-950/40 p-4 backdrop-blur-sm">
-      <div className="mx-auto w-full max-w-xl rounded-[28px] bg-white p-4 shadow-2xl dark:bg-[#101926]">
-        <div className="mb-3 h-1.5 w-12 rounded-full bg-slate-200 dark:bg-white/10" />
-        <h3 className="text-lg font-extrabold">Профиль</h3>
-        <div className="mt-4 space-y-3">
+    <Sheet
+      open={open}
+      onClose={close}
+      title="Профиль"
+      description="Эти данные видят участники вашей семьи."
+    >
+      <div className="mt-4 flex justify-center">
+        <button
+          type="button"
+          className="relative rounded-full"
+          onClick={() => fileRef.current?.click()}
+          aria-label="Выбрать фотографию профиля"
+        >
+          <Avatar src={avatarUrl} name={name || user.name} size="lg" className="h-20 w-20" />
+          <span className="absolute bottom-0 right-0 flex h-8 w-8 items-center justify-center rounded-full bg-[var(--color-accent)] text-white">
+            <Camera aria-hidden="true" size={16} />
+          </span>
+        </button>
+        <input
+          ref={fileRef}
+          className="hidden"
+          type="file"
+          accept="image/*"
+          onChange={async (event) => {
+            const file = event.target.files?.[0];
+            if (file) setAvatarUrl(await fileToDataUrl(file));
+          }}
+        />
+      </div>
+      <div className="mt-5 space-y-4">
+        <label className="block">
+          <span className="mb-1.5 block text-[13px] font-medium">Имя</span>
           <input
+            className="field"
             value={name}
             onChange={(event) => setName(event.target.value)}
-            placeholder="Имя"
-            className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 outline-none focus:border-accent dark:border-white/10 dark:bg-white/5"
+            autoComplete="name"
           />
+        </label>
+        <label className="block">
+          <span className="mb-1.5 block text-[13px] font-medium">Телефон</span>
           <input
+            className="field"
             value={phone}
             onChange={(event) => setPhone(event.target.value)}
-            placeholder="Телефон"
-            className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 outline-none focus:border-accent dark:border-white/10 dark:bg-white/5"
+            inputMode="tel"
+            autoComplete="tel"
           />
+        </label>
+        <label className="block">
+          <span className="mb-1.5 block text-[13px] font-medium">О себе</span>
           <textarea
+            className="field min-h-24 resize-none"
             value={about}
+            maxLength={140}
             onChange={(event) => setAbout(event.target.value)}
-            rows={3}
-            placeholder="О себе"
-            className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 outline-none focus:border-accent dark:border-white/10 dark:bg-white/5"
           />
-        </div>
-        <div className="mt-4 flex gap-3">
-          <button
-            type="button"
-            onClick={() => setModalState(null)}
-            className="flex-1 rounded-2xl border border-slate-200 px-4 py-3 font-semibold dark:border-white/10"
-          >
-            Отмена
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              updateProfile({ name, phone, about });
-              setModalState(null);
-            }}
-            className="flex-1 rounded-2xl bg-accent px-4 py-3 font-semibold text-white"
-          >
-            Сохранить
-          </button>
-        </div>
+          <span className="mt-1 block text-right text-[11px] text-[var(--color-text-muted)]">
+            {about.length}/140
+          </span>
+        </label>
       </div>
-    </div>
+      <div className="mt-5 grid grid-cols-2 gap-3">
+        <button type="button" className="secondary-button" onClick={close}>
+          Отмена
+        </button>
+        <button
+          type="button"
+          className="primary-button"
+          disabled={!valid}
+          onClick={() => {
+            updateProfile({ name, phone, about, avatarUrl });
+            showToast("Профиль обновлён");
+            close();
+          }}
+        >
+          Сохранить
+        </button>
+      </div>
+    </Sheet>
   );
 }

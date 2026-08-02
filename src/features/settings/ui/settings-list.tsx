@@ -1,96 +1,176 @@
-import { ChevronRight } from "lucide-react";
+import { useState } from "react";
+import {
+  Bell,
+  ChevronRight,
+  CircleUserRound,
+  Info,
+  Languages,
+  LogOut,
+  MessageCircle,
+  MoonStar,
+  Shield,
+  Smartphone,
+  Timer,
+  Trash2,
+  type LucideIcon
+} from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { useSettingsSections } from "@/features/settings/model/use-settings-sections";
 import { deleteOfflineDb } from "@/shared/lib/offline/db";
 import { signOutSupabase } from "@/shared/lib/supabase/messaging";
+import { isSupabaseConfigured } from "@/shared/config/env";
 import { useAuthStore, type AuthState } from "@/shared/model/auth-store";
 import { useChatStore, type ChatState } from "@/shared/model/chat-store";
 import { useMessageStore, type MessageState } from "@/shared/model/message-store";
 import { useUiStore, type UiState } from "@/shared/model/ui-store";
-import { SectionCard } from "@/shared/ui/section-card";
+import { Sheet } from "@/shared/ui/sheet";
+
+interface SettingsRowProps {
+  label: string;
+  value?: string;
+  icon: LucideIcon;
+  onClick: () => void;
+}
+
+function SettingsRow({ label, value, icon: Icon, onClick }: SettingsRowProps) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="flex min-h-[58px] w-full items-center gap-3 border-b border-[var(--color-divider)] px-3 text-left last:border-b-0 hover:bg-[var(--color-surface-secondary)]"
+    >
+      <Icon aria-hidden="true" size={20} />
+      <span className="min-w-0 flex-1 font-medium">{label}</span>
+      {value && (
+        <span className="max-w-[38%] truncate text-[12px] text-[var(--color-text-secondary)]">
+          {value}
+        </span>
+      )}
+      <ChevronRight aria-hidden="true" size={17} className="text-[var(--color-text-muted)]" />
+    </button>
+  );
+}
 
 export function SettingsList() {
-  const items = useSettingsSections();
   const navigate = useNavigate();
   const signOut = useAuthStore((state: AuthState) => state.signOut);
   const clearAuth = useAuthStore((state: AuthState) => state.clearAuth);
   const clearAllChats = useChatStore((state: ChatState) => state.clearAllChats);
   const clearAllMessages = useMessageStore((state: MessageState) => state.clearAllMessages);
   const setModalState = useUiStore((state: UiState) => state.setModalState);
-  const setTheme = useUiStore((state: UiState) => state.setTheme);
-  const resetUi = useUiStore((state: UiState) => state.resetUi);
   const theme = useUiStore((state: UiState) => state.theme);
+  const messageTtl = useUiStore((state: UiState) => state.messageTtl);
+  const resetUi = useUiStore((state: UiState) => state.resetUi);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const themeLabel = theme === "system" ? "Как в системе" : theme === "dark" ? "Тёмная" : "Светлая";
+  const ttlLabel =
+    messageTtl === "off"
+      ? "Выключено"
+      : messageTtl === "24h"
+        ? "24 часа"
+        : messageTtl === "7d"
+          ? "7 дней"
+          : messageTtl === "30d"
+            ? "30 дней"
+            : "90 дней";
 
-  function handleItemClick(label: string) {
-    if (label === "Профиль") setModalState("profile");
-    if (label === "Семья") navigate("/family");
-    if (label === "Уведомления") setModalState("notifications");
-    if (label === "Автоудаление сообщений") setModalState("auto-delete");
-    if (label === "Тема") setTheme(theme === "light" ? "dark" : "light");
-    if (label === "Безопасность") setModalState("security");
-    if (label === "О приложении") setModalState("about");
+  async function handleSignOut() {
+    if (isSupabaseConfigured) await signOutSupabase().catch(() => undefined);
+    signOut();
+    navigate("/chats");
+  }
+
+  async function eraseLocalData() {
+    if (isSupabaseConfigured) await signOutSupabase().catch(() => undefined);
+    await deleteOfflineDb().catch(() => undefined);
+    clearAllMessages();
+    clearAllChats();
+    clearAuth();
+    resetUi();
+    localStorage.removeItem("achat-auth");
+    localStorage.removeItem("achat-ui");
+    localStorage.removeItem("achat-chats");
+    localStorage.removeItem("achat-settings");
+    setDeleteOpen(false);
+    navigate("/settings");
   }
 
   return (
-    <SectionCard className="overflow-hidden p-0">
-      <div className="divide-y divide-slate-200/70 dark:divide-white/10">
-        {items.map((item) => {
-          const Icon = item.icon;
-
-          return (
-            <button
-              key={item.label}
-              type="button"
-              onClick={() => handleItemClick(item.label)}
-              className="flex w-full items-center gap-3 px-4 py-4 text-left transition hover:bg-slate-50/80 dark:hover:bg-white/5"
-            >
-              <div className="flex h-10 w-10 items-center justify-center rounded-full border border-slate-200/80 dark:border-white/10">
-                <Icon className="h-4 w-4" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="font-semibold">{item.label}</p>
-              </div>
-              {item.value && (
-                <span className="text-sm text-ink-soft dark:text-slate-400">{item.value}</span>
-              )}
-              <ChevronRight className="h-4 w-4 text-ink-soft dark:text-slate-500" />
-            </button>
-          );
-        })}
+    <>
+      <div className="space-y-4">
+        <div className="overflow-hidden rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)]">
+          <SettingsRow
+            icon={CircleUserRound}
+            label="Профиль"
+            onClick={() => setModalState("profile")}
+          />
+          <SettingsRow icon={Smartphone} label="Аккаунт" onClick={() => setModalState("account")} />
+          <SettingsRow
+            icon={Shield}
+            label="Конфиденциальность"
+            onClick={() => setModalState("privacy")}
+          />
+        </div>
+        <div className="overflow-hidden rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)]">
+          <SettingsRow
+            icon={Bell}
+            label="Уведомления"
+            onClick={() => setModalState("notifications")}
+          />
+          <SettingsRow icon={MessageCircle} label="Чаты" onClick={() => setModalState("chats")} />
+          <SettingsRow
+            icon={Timer}
+            label="Автоудаление"
+            value={ttlLabel}
+            onClick={() => setModalState("auto-delete")}
+          />
+          <SettingsRow
+            icon={MoonStar}
+            label="Тема"
+            value={themeLabel}
+            onClick={() => setModalState("theme")}
+          />
+          <SettingsRow
+            icon={Languages}
+            label="Язык"
+            value="Русский"
+            onClick={() => setModalState("language")}
+          />
+          <SettingsRow icon={Info} label="О приложении" onClick={() => setModalState("about")} />
+        </div>
         <button
           type="button"
-          onClick={async () => {
-            await signOutSupabase();
-            signOut();
-            navigate("/chats");
-          }}
-          className="flex w-full items-center gap-3 px-4 py-4 text-left text-rose-500 transition hover:bg-rose-50 dark:hover:bg-rose-500/10"
+          onClick={handleSignOut}
+          className="danger-button min-h-[56px] w-full justify-start border border-[var(--color-border)] bg-[var(--color-surface)]"
         >
-          Выйти из аккаунта
+          <LogOut aria-hidden="true" size={20} /> Выйти из аккаунта
         </button>
         <button
           type="button"
-          onClick={async () => {
-            const confirmed = window.confirm("Стереть все данные приложения без возможности восстановления?");
-            if (!confirmed) return;
-
-            await signOutSupabase().catch(() => undefined);
-            await deleteOfflineDb().catch(() => undefined);
-            clearAllMessages();
-            clearAllChats();
-            clearAuth();
-            resetUi();
-            localStorage.removeItem("achat-auth");
-            localStorage.removeItem("achat-ui");
-            localStorage.removeItem("achat-chats");
-            localStorage.removeItem("achat-messages");
-            navigate("/settings");
-          }}
-          className="flex w-full items-center gap-3 px-4 py-4 text-left text-rose-600 transition hover:bg-rose-50 dark:hover:bg-rose-500/10"
+          onClick={() => setDeleteOpen(true)}
+          className="flex min-h-11 w-full items-center justify-center gap-2 text-[12px] font-medium text-[var(--color-danger)]"
         >
-          Полностью стереть данные
+          <Trash2 aria-hidden="true" size={16} /> Стереть локальные данные
         </button>
       </div>
-    </SectionCard>
+      <Sheet
+        open={deleteOpen}
+        onClose={() => setDeleteOpen(false)}
+        title="Стереть данные?"
+        description="Профиль, локальные чаты, сообщения и ключи будут удалены с этого устройства без возможности восстановления."
+      >
+        <div className="mt-5 grid grid-cols-2 gap-3">
+          <button type="button" className="secondary-button" onClick={() => setDeleteOpen(false)}>
+            Отмена
+          </button>
+          <button
+            type="button"
+            className="danger-button bg-[var(--color-danger)] text-white"
+            onClick={eraseLocalData}
+          >
+            Стереть
+          </button>
+        </div>
+      </Sheet>
+    </>
   );
 }

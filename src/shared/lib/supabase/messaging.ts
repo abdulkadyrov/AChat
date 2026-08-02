@@ -35,6 +35,14 @@ type MessageRow = {
   media_path: string | null;
 };
 
+type ChatMemberWithUserRow = {
+  chat_id: string;
+  user_id: string;
+  users: { avatar_url: string | null; phone: string | null } | null;
+};
+
+type ChatInviteSummaryRow = { id: string; chat_id: string };
+
 function mapChatRow(
   row: ChatRow,
   memberIds: string[],
@@ -169,10 +177,7 @@ export async function createRemoteChat(input: {
   return { chat, invite, chatSecret };
 }
 
-export async function joinRemoteChatByCode(input: {
-  accessCode: string;
-  user: UserProfile;
-}) {
+export async function joinRemoteChatByCode(input: { accessCode: string; user: UserProfile }) {
   const remoteUserId = await ensureSupabaseIdentity(input.user);
   const normalizedPhone = normalizePhone(input.user.phone);
   const { data, error } = await supabase.rpc("consume_chat_invite_by_code", {
@@ -184,13 +189,7 @@ export async function joinRemoteChatByCode(input: {
 
   const payload = data as { chat: ChatRow; chat_secret: string };
   return {
-    chat: mapChatRow(
-      payload.chat,
-      [remoteUserId],
-      [normalizedPhone],
-      [input.user.avatarUrl],
-      null
-    ),
+    chat: mapChatRow(payload.chat, [remoteUserId], [normalizedPhone], [input.user.avatarUrl], null),
     chatSecret: payload.chat_secret
   };
 }
@@ -222,17 +221,19 @@ export async function fetchRemoteChats(user: UserProfile) {
     .select("id,chat_id,access_code,allowed_phones,allowed_phone,max_participants")
     .in("chat_id", chatIds);
 
+  const fullMemberRows = (allMembers ?? []) as unknown as ChatMemberWithUserRow[];
+  const inviteRows = (invites ?? []) as unknown as ChatInviteSummaryRow[];
   return (chats as ChatRow[]).map((row) => {
-    const members = (allMembers ?? []).filter((member) => member.chat_id === row.id);
+    const members = fullMemberRows.filter((member) => member.chat_id === row.id);
     const avatars = members
-      .map((member: any) => member.users?.avatar_url)
-      .filter(Boolean)
+      .map((member) => member.users?.avatar_url)
+      .filter((value): value is string => Boolean(value))
       .slice(0, 3);
     const memberIds = members.map((member) => member.user_id);
     const memberPhones = members
-      .map((member: any) => normalizePhone(member.users?.phone ?? ""))
+      .map((member) => normalizePhone(member.users?.phone ?? ""))
       .filter(Boolean);
-    const inviteId = (invites ?? []).find((item: any) => item.chat_id === row.id)?.id ?? null;
+    const inviteId = inviteRows.find((item) => item.chat_id === row.id)?.id ?? null;
     return mapChatRow(row, memberIds, memberPhones, avatars, inviteId);
   });
 }
@@ -299,7 +300,11 @@ export async function sendRemoteTextMessage(input: {
     reply_to: input.replyTo ?? null
   };
 
-  const { data, error } = await supabase.from("messages").insert(payload).select().single<MessageRow>();
+  const { data, error } = await supabase
+    .from("messages")
+    .insert(payload)
+    .select()
+    .single<MessageRow>();
   if (error || !data) throw error ?? new Error("Unable to send message");
 
   return {
@@ -363,7 +368,11 @@ export async function sendRemoteMediaMessage(input: {
     reply_to: input.replyTo ?? null
   };
 
-  const { data, error } = await supabase.from("messages").insert(payload).select().single<MessageRow>();
+  const { data, error } = await supabase
+    .from("messages")
+    .insert(payload)
+    .select()
+    .single<MessageRow>();
   if (error || !data) throw error ?? new Error("Unable to send media message");
 
   return {

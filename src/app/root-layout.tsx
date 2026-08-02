@@ -4,6 +4,7 @@ import { AuthPage } from "@/pages/auth/ui/auth-page";
 import { useAuthStore, type AuthState } from "@/shared/model/auth-store";
 import { applyTheme } from "@/shared/lib/theme/apply-theme";
 import { ensureSupabaseIdentity } from "@/shared/lib/supabase/messaging";
+import { isSupabaseConfigured } from "@/shared/config/env";
 import { useChatStore, type ChatState } from "@/shared/model/chat-store";
 import { useUiStore, type UiState } from "@/shared/model/ui-store";
 import { AppShell } from "@/widgets/app-shell/ui/app-shell";
@@ -16,6 +17,12 @@ export function RootLayout() {
 
   useEffect(() => {
     applyTheme(theme);
+    if (theme !== "system") return;
+
+    const media = window.matchMedia("(prefers-color-scheme: dark)");
+    const handleChange = () => applyTheme("system");
+    media.addEventListener("change", handleChange);
+    return () => media.removeEventListener("change", handleChange);
   }, [theme]);
 
   useEffect(() => {
@@ -23,13 +30,17 @@ export function RootLayout() {
 
     let active = true;
 
-    ensureSupabaseIdentity(user)
-      .then((remoteUserId) => {
-        if (!active) return;
-        setRemoteUserId(remoteUserId);
-        return hydrateChats({ ...user, id: remoteUserId });
-      })
-      .catch(() => undefined);
+    if (!isSupabaseConfigured) {
+      hydrateChats(user).catch(() => undefined);
+    } else {
+      ensureSupabaseIdentity(user)
+        .then((remoteUserId) => {
+          if (!active) return;
+          setRemoteUserId(remoteUserId);
+          return hydrateChats({ ...user, id: remoteUserId });
+        })
+        .catch(() => hydrateChats(user));
+    }
 
     return () => {
       active = false;
@@ -37,8 +48,8 @@ export function RootLayout() {
   }, [hydrateChats, setRemoteUserId, user]);
 
   return (
-    <div className={theme === "dark" ? "dark" : ""}>
-      <div className="min-h-screen bg-canvas bg-paper text-ink transition-colors dark:bg-canvas-dark dark:bg-night dark:text-ink-inverse">
+    <div>
+      <div className="app-viewport">
         {user ? (
           <AppShell>
             <Outlet />

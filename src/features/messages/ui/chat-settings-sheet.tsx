@@ -1,162 +1,202 @@
 import { useEffect, useMemo, useState } from "react";
+import { Copy, QrCode, Trash2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import type { Chat, ChatInvite, MessageTTL } from "@/shared/types/domain";
 import { useChatStore, type ChatState } from "@/shared/model/chat-store";
 import { useUiStore, type UiState } from "@/shared/model/ui-store";
-import { AccessCodeCard } from "@/shared/ui/access-code-card";
+import { QrCodeCard } from "@/shared/ui/qr-code-card";
+import { Sheet } from "@/shared/ui/sheet";
+import type { Chat, ChatInvite, MessageTTL } from "@/shared/types/domain";
 
 const ttlOptions: Array<{ value: MessageTTL; label: string }> = [
-  { value: "off", label: "Выкл" },
+  { value: "off", label: "Выключено" },
   { value: "24h", label: "24 часа" },
   { value: "7d", label: "7 дней" },
-  { value: "30d", label: "30 дней" }
+  { value: "30d", label: "30 дней" },
+  { value: "90d", label: "90 дней" }
 ];
 
-interface ChatSettingsSheetProps {
-  chat: Chat;
-}
-
-export function ChatSettingsSheet({ chat }: ChatSettingsSheetProps) {
+export function ChatSettingsSheet({ chat }: { chat: Chat }) {
   const navigate = useNavigate();
   const modalState = useUiStore((state: UiState) => state.modalState);
   const setModalState = useUiStore((state: UiState) => state.setModalState);
+  const showToast = useUiStore((state: UiState) => state.showToast);
   const invites = useChatStore((state: ChatState) => state.invites);
   const updateChatSettings = useChatStore((state: ChatState) => state.updateChatSettings);
   const deleteChat = useChatStore((state: ChatState) => state.deleteChat);
   const [title, setTitle] = useState(chat.title);
   const [memberLimit, setMemberLimit] = useState(String(chat.memberLimit ?? 3));
   const [messageTtl, setMessageTtl] = useState<MessageTTL>(chat.messageTtl);
-  const [isDeleting, setDeleting] = useState(false);
-
-  useEffect(() => {
-    if (modalState === "chat-settings") {
-      setTitle(chat.title);
-      setMemberLimit(String(chat.memberLimit ?? 3));
-      setMessageTtl(chat.messageTtl);
-    }
-  }, [chat, modalState]);
-
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [qrOpen, setQrOpen] = useState(false);
+  const open = modalState === "chat-settings";
   const invite = useMemo(
     () => invites.find((item: ChatInvite) => item.chatId === chat.id),
     [chat.id, invites]
   );
 
-  if (modalState !== "chat-settings") return null;
+  useEffect(() => {
+    if (open) {
+      setTitle(chat.title);
+      setMemberLimit(String(chat.memberLimit ?? 3));
+      setMessageTtl(chat.messageTtl);
+      setConfirmDelete(false);
+    }
+  }, [chat, open]);
+
+  function close() {
+    setModalState(null);
+  }
+
+  async function save() {
+    await updateChatSettings({
+      chatId: chat.id,
+      title,
+      messageTtl,
+      memberLimit: chat.type === "group" ? Number(memberLimit) || 1 : undefined
+    });
+    showToast("Настройки чата сохранены");
+    close();
+  }
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/40 p-4 backdrop-blur-sm">
-      <div className="mx-auto w-full max-w-xl rounded-[28px] bg-white p-4 shadow-2xl dark:bg-[#101926]">
-        <div className="mb-3 h-1.5 w-12 rounded-full bg-slate-200 dark:bg-white/10" />
-        <h3 className="text-lg font-extrabold">Настройки чата</h3>
-
-        <div className="mt-4 space-y-4">
-          <div>
-            <p className="mb-2 text-sm font-semibold">Название</p>
-            <input
-              value={title}
-              onChange={(event) => setTitle(event.target.value)}
-              className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 outline-none focus:border-accent dark:border-white/10 dark:bg-white/5"
-            />
-          </div>
-
-          <div>
-            <p className="mb-2 text-sm font-semibold">Автоудаление сообщений</p>
-            <div className="grid grid-cols-2 gap-2">
-              {ttlOptions.map((option) => (
-                <button
-                  key={option.value}
-                  type="button"
-                  onClick={() => setMessageTtl(option.value)}
-                  className={`rounded-2xl px-4 py-3 text-sm font-semibold transition ${
-                    messageTtl === option.value
-                      ? "bg-accent text-white"
-                      : "border border-slate-200 dark:border-white/10"
-                  }`}
-                >
-                  {option.label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {chat.type === "group" ? (
-            <div>
-              <p className="mb-2 text-sm font-semibold">Количество разрешённых номеров</p>
+    <>
+      <Sheet open={open} onClose={close} title="Настройки чата">
+        {!confirmDelete ? (
+          <div className="mt-4 space-y-4">
+            <label className="block">
+              <span className="mb-1.5 block text-[13px] font-medium">Название</span>
               <input
-                type="number"
-                min={1}
-                max={50}
-                value={memberLimit}
-                onChange={(event) => setMemberLimit(event.target.value)}
-                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 outline-none focus:border-accent dark:border-white/10 dark:bg-white/5"
+                className="field"
+                value={title}
+                onChange={(event) => setTitle(event.target.value)}
               />
-            </div>
-          ) : (
-            <div className="rounded-2xl bg-slate-100 px-4 py-3 text-sm dark:bg-white/5">
-              Этот личный чат может открыть только номер: {chat.targetPhone ?? "не задан"}
-            </div>
-          )}
-
-          {invite && (
-            <div>
-              <p className="mb-2 text-sm font-semibold">Код приглашения</p>
-              <AccessCodeCard value={invite.accessCode} />
-            </div>
-          )}
-
-          <div className="rounded-2xl border border-rose-200/70 bg-rose-50 px-4 py-4 dark:border-rose-500/20 dark:bg-rose-500/10">
-            <p className="text-sm font-semibold text-rose-700 dark:text-rose-200">Полное удаление чата</p>
-            <p className="mt-1 text-sm text-rose-600 dark:text-rose-200/80">
-              Чат будет удалён из списка вместе с сообщениями и кодом доступа.
-            </p>
+            </label>
+            <label className="block">
+              <span className="mb-1.5 block text-[13px] font-medium">
+                Автоудаление новых сообщений
+              </span>
+              <select
+                className="field"
+                value={messageTtl}
+                onChange={(event) => setMessageTtl(event.target.value as MessageTTL)}
+              >
+                {ttlOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            {chat.type === "group" && (
+              <label className="block">
+                <span className="mb-1.5 block text-[13px] font-medium">Лимит участников</span>
+                <input
+                  type="number"
+                  min={1}
+                  max={50}
+                  className="field"
+                  value={memberLimit}
+                  onChange={(event) => setMemberLimit(event.target.value)}
+                />
+              </label>
+            )}
+            {invite && (
+              <div className="rounded-2xl bg-[var(--color-surface-secondary)] p-3">
+                <p className="text-[11px] text-[var(--color-text-secondary)]">Код приглашения</p>
+                <div className="mt-1 flex items-center">
+                  <span className="flex-1 text-[20px] font-bold tracking-[0.2em] text-[var(--color-accent)]">
+                    {invite.accessCode}
+                  </span>
+                  <button
+                    type="button"
+                    className="icon-button"
+                    onClick={async () => {
+                      await navigator.clipboard.writeText(invite.accessCode);
+                      showToast("Код скопирован");
+                    }}
+                    aria-label="Копировать код"
+                  >
+                    <Copy aria-hidden="true" size={18} />
+                  </button>
+                  <button
+                    type="button"
+                    className="icon-button"
+                    onClick={() => setQrOpen(true)}
+                    aria-label="Показать QR-код"
+                  >
+                    <QrCode aria-hidden="true" size={19} />
+                  </button>
+                </div>
+              </div>
+            )}
             <button
               type="button"
-              disabled={isDeleting}
-              onClick={async () => {
-                const confirmed = window.confirm(`Удалить чат "${chat.title}" полностью?`);
-                if (!confirmed) return;
-
-                setDeleting(true);
-                try {
-                  await deleteChat(chat.id);
-                  setModalState(null);
-                  navigate("/chats");
-                } finally {
-                  setDeleting(false);
-                }
-              }}
-              className="mt-4 w-full rounded-2xl bg-rose-600 px-4 py-3 font-semibold text-white transition disabled:cursor-not-allowed disabled:opacity-60"
+              className="danger-button w-full"
+              onClick={() => setConfirmDelete(true)}
             >
-              {isDeleting ? "Удаляем чат..." : "Удалить чат полностью"}
+              <Trash2 aria-hidden="true" size={18} /> Удалить чат
+            </button>
+            <div className="grid grid-cols-2 gap-3">
+              <button type="button" className="secondary-button" onClick={close}>
+                Отмена
+              </button>
+              <button
+                type="button"
+                className="primary-button"
+                disabled={!title.trim()}
+                onClick={save}
+              >
+                Сохранить
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="mt-4">
+            <p className="text-[14px] leading-6 text-[var(--color-text-secondary)]">
+              Чат, локальные сообщения и приглашение будут удалены. Это действие нельзя отменить.
+            </p>
+            <div className="mt-5 grid grid-cols-2 gap-3">
+              <button
+                type="button"
+                className="secondary-button"
+                onClick={() => setConfirmDelete(false)}
+              >
+                Назад
+              </button>
+              <button
+                type="button"
+                className="danger-button bg-[var(--color-danger)] text-white"
+                onClick={async () => {
+                  await deleteChat(chat.id);
+                  close();
+                  navigate("/chats");
+                }}
+              >
+                Удалить
+              </button>
+            </div>
+          </div>
+        )}
+      </Sheet>
+      <Sheet
+        open={qrOpen}
+        onClose={() => setQrOpen(false)}
+        title="QR-код чата"
+        description="Покажите код только приглашённому участнику."
+      >
+        {invite && (
+          <div className="mt-4">
+            <QrCodeCard value={invite.token} />
+            <button
+              type="button"
+              className="primary-button mt-4 w-full"
+              onClick={() => setQrOpen(false)}
+            >
+              Готово
             </button>
           </div>
-        </div>
-
-        <div className="mt-5 flex gap-3">
-          <button
-            type="button"
-            onClick={() => setModalState(null)}
-            className="flex-1 rounded-2xl border border-slate-200 px-4 py-3 font-semibold dark:border-white/10"
-          >
-            Отмена
-          </button>
-          <button
-            type="button"
-            onClick={async () => {
-              await updateChatSettings({
-                chatId: chat.id,
-                title,
-                messageTtl,
-                memberLimit: chat.type === "group" ? Number(memberLimit) || 1 : undefined
-              });
-              setModalState(null);
-            }}
-            className="flex-1 rounded-2xl bg-accent px-4 py-3 font-semibold text-white"
-          >
-            Сохранить
-          </button>
-        </div>
-      </div>
-    </div>
+        )}
+      </Sheet>
+    </>
   );
 }

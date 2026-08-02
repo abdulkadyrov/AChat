@@ -6,9 +6,5 @@ interface SectionCardProps extends PropsWithChildren {
 }
 
 export function SectionCard({ children, className }: SectionCardProps) {
-  return (
-    <section className={cn("glass-panel rounded-[24px] p-4 sm:p-5", className)}>
-      {children}
-    </section>
-  );
+  return <section className={cn("section-card p-4", className)}>{children}</section>;
 }

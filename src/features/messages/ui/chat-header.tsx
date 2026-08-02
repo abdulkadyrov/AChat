@@ -1,4 +1,4 @@
-import { ArrowLeft, Lock, MoreVertical, Phone } from "lucide-react";
+import { ArrowLeft, LockKeyhole, MoreVertical } from "lucide-react";
 import { Link } from "react-router-dom";
 import type { Chat } from "@/shared/types/domain";
 import { useUiStore, type UiState } from "@/shared/model/ui-store";
@@ -7,39 +7,43 @@ import { IconButton } from "@/shared/ui/icon-button";
 
 interface ChatHeaderProps {
   chat: Chat;
+  embedded?: boolean;
 }
 
-export function ChatHeader({ chat }: ChatHeaderProps) {
+export function ChatHeader({ chat, embedded = false }: ChatHeaderProps) {
   const setModalState = useUiStore((state: UiState) => state.setModalState);
 
   return (
-    <div className="mb-4 flex items-center gap-3">
-      <Link
-        to="/chats"
-        className="flex h-10 w-10 items-center justify-center rounded-full border border-slate-200/70 bg-white/90 dark:border-white/10 dark:bg-white/5"
+    <header className="top-bar shrink-0">
+      {!embedded && (
+        <Link to="/chats" className="icon-button -ml-2" aria-label="Назад к чатам">
+          <ArrowLeft aria-hidden="true" size={22} />
+        </Link>
+      )}
+      <button
+        type="button"
+        className="flex min-w-0 flex-1 items-center gap-3 text-left"
+        onClick={() => setModalState("chat-settings")}
+        aria-label={`Открыть информацию о чате ${chat.title}`}
       >
-        <ArrowLeft className="h-5 w-5" />
-      </Link>
-      <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-3">
-          <AvatarStack avatars={chat.avatarGroup} size="sm" />
-          <div className="min-w-0">
-            <p className="truncate text-lg font-extrabold tracking-[-0.03em]">{chat.title}</p>
-            <p className="flex items-center gap-1 text-xs text-ink-soft dark:text-slate-400">
-              <Lock className="h-3 w-3" />
-              Сообщения защищены
-            </p>
-          </div>
-        </div>
-      </div>
-      <div className="flex items-center gap-2">
-        <IconButton onClick={() => setModalState("chat-settings")}>
-          <Phone className="h-4 w-4" />
-        </IconButton>
-        <IconButton onClick={() => setModalState("chat-settings")}>
-          <MoreVertical className="h-4 w-4" />
-        </IconButton>
-      </div>
-    </div>
+        <AvatarStack avatars={chat.avatarGroup} names={[chat.title, chat.title]} size="sm" />
+        <span className="min-w-0">
+          <span className="flex items-center gap-1.5">
+            <span className="truncate text-[17px] font-semibold">{chat.title}</span>
+            <LockKeyhole
+              aria-label="Сквозное шифрование"
+              size={13}
+              className="text-[var(--color-text-secondary)]"
+            />
+          </span>
+          <span className="block truncate text-[12px] text-[var(--color-text-secondary)]">
+            {chat.type === "group" ? `${chat.participantIds.length + 1} участника` : "В сети"}
+          </span>
+        </span>
+      </button>
+      <IconButton onClick={() => setModalState("chat-settings")} aria-label="Настройки чата">
+        <MoreVertical aria-hidden="true" size={21} />
+      </IconButton>
+    </header>
   );
 }

@@ -1,8 +1,19 @@
-export type MessageType = "text" | "voice" | "image" | "system";
+export type MessageType = "text" | "voice" | "image" | "file" | "system";
 export type ChatType = "direct" | "group";
-export type ThemeMode = "light" | "dark";
-export type MessageTTL = "off" | "24h" | "7d" | "30d";
+export type ThemeMode = "system" | "light" | "dark";
+export type MessageTTL = "off" | "24h" | "7d" | "30d" | "90d";
 export type InviteKind = "direct" | "group";
+export type MessageStatus =
+  | "queued"
+  | "encrypting"
+  | "uploading"
+  | "sending"
+  | "sent"
+  | "delivered"
+  | "read"
+  | "failed"
+  | "deleted"
+  | "expired";
 
 export interface UserProfile {
   id: string;
@@ -76,7 +87,10 @@ export interface Message {
   mediaPath?: string;
   mediaDataUrl?: string;
   durationSec?: number;
-  status?: "sending" | "sent" | "read";
+  fileName?: string;
+  fileSize?: number;
+  editedAt?: string;
+  status?: MessageStatus;
 }
 
 export interface DecryptedMessage extends Message {

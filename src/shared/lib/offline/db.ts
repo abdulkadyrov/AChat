@@ -1,4 +1,4 @@
-import { openDB } from "idb";
+import { deleteDB, openDB } from "idb";
 import type { Message } from "@/shared/types/domain";
 
 const DB_NAME = "achat-offline";
@@ -38,6 +38,5 @@ export async function cacheMessages(messages: Message[]) {
 }
 
 export async function deleteOfflineDb() {
-  const { deleteDB } = await import("idb");
   await deleteDB(DB_NAME);
 }
