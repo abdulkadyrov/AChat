@@ -25,4 +25,14 @@ describe("achat-crypto", () => {
 
     expect(decrypted).toBe("backup seed");
   });
+
+  it("encrypts image-sized payloads without overflowing the call stack", async () => {
+    const key = await generateDeviceKey();
+    const payload = "x".repeat(2 * 1024 * 1024);
+
+    const encrypted = await encryptText(payload, key);
+    const decrypted = await decryptText(encrypted.ciphertext, encrypted.iv, key);
+
+    expect(decrypted).toBe(payload);
+  });
 });

@@ -3,6 +3,7 @@ import { Camera, Mic, Paperclip, Send, Smile, Square, X } from "lucide-react";
 import { AttachmentSheet } from "@/features/messages/ui/attachment-sheet";
 import { useSendMediaMessage, useSendMessage } from "@/features/messages/model/use-send-message";
 import { useMessageStore, type MessageState } from "@/shared/model/message-store";
+import { prepareImageDataUrl } from "@/shared/lib/media/prepare-image";
 import { useUiStore, type UiState } from "@/shared/model/ui-store";
 import { IconButton } from "@/shared/ui/icon-button";
 
@@ -20,6 +21,12 @@ function fileToDataUrl(file: File) {
     reader.onerror = () => reject(new Error("Не удалось прочитать файл"));
     reader.readAsDataURL(file);
   });
+}
+
+function errorMessage(error: unknown, fallback: string) {
+  if (error instanceof Error && error.message) return error.message;
+  if (error && typeof error === "object" && "message" in error) return String(error.message);
+  return fallback;
 }
 
 export function MessageInput({ chatId, replyPreview, ttlLabel, onSent }: MessageInputProps) {
@@ -77,7 +84,7 @@ export function MessageInput({ chatId, replyPreview, ttlLabel, onSent }: Message
   async function pickImage(file: File | null) {
     if (!file) return;
     try {
-      setImagePreview({ file, dataUrl: await fileToDataUrl(file) });
+      setImagePreview({ file, dataUrl: await prepareImageDataUrl(file) });
     } catch (error) {
       showToast(error instanceof Error ? error.message : "Не удалось открыть фото");
     }
@@ -94,8 +101,8 @@ export function MessageInput({ chatId, replyPreview, ttlLabel, onSent }: Message
       });
       setImagePreview(null);
       onSent?.();
-    } catch {
-      showToast("Не удалось отправить фото. Повторите попытку");
+    } catch (error) {
+      showToast(errorMessage(error, "Не удалось отправить фото. Повторите попытку"));
     }
   }
 
@@ -115,8 +122,8 @@ export function MessageInput({ chatId, replyPreview, ttlLabel, onSent }: Message
         fileSize: file.size
       });
       onSent?.();
-    } catch {
-      showToast("Не удалось отправить файл. Повторите попытку");
+    } catch (error) {
+      showToast(errorMessage(error, "Не удалось отправить файл. Повторите попытку"));
     }
   }
 
@@ -181,8 +188,8 @@ export function MessageInput({ chatId, replyPreview, ttlLabel, onSent }: Message
       });
       setVoicePreview(null);
       onSent?.();
-    } catch {
-      showToast("Не удалось отправить голосовое. Повторите попытку");
+    } catch (error) {
+      showToast(errorMessage(error, "Не удалось отправить голосовое. Повторите попытку"));
     }
   }
 
@@ -335,7 +342,7 @@ export function MessageInput({ chatId, replyPreview, ttlLabel, onSent }: Message
       </div>
       {sendingState === "error" && (
         <p role="alert" className="mt-1 text-right text-[11px] text-[var(--color-danger)]">
-          Ошибка отправки — текст сохранён
+          Не отправлено — повторите попытку
         </p>
       )}
       <input

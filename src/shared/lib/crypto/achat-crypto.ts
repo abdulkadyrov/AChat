@@ -3,7 +3,14 @@ const encoder = new TextEncoder();
 const decoder = new TextDecoder();
 
 function bytesToBase64(bytes: Uint8Array) {
-  return btoa(String.fromCharCode(...bytes));
+  const chunkSize = 32_768;
+  let binary = "";
+
+  for (let offset = 0; offset < bytes.length; offset += chunkSize) {
+    binary += String.fromCharCode(...bytes.subarray(offset, offset + chunkSize));
+  }
+
+  return btoa(binary);
 }
 
 function base64ToBytes(value: string) {
